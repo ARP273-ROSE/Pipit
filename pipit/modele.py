@@ -75,6 +75,17 @@ def regrouper(disques: list[Disque]) -> list[Peripherique]:
     return sorted(perifs, key=lambda p: ((p.lettres or ["~"])[0], p.nom))
 
 
+SUFFIXES = (" SCSI Disk Device", " USB Device", " USB Disk Device", " UAS Device")
+
+
+def nettoyer_nom(nom: str) -> str:
+    """« Micron CT4000X6SSD9 SCSI Disk Device » → « Micron CT4000X6SSD9 » (suffixes ajoutés par Windows)."""
+    for s in SUFFIXES:
+        if nom.endswith(s) and len(nom) > len(s):
+            return nom[:-len(s)].strip()
+    return nom
+
+
 def taille_lisible(octets: int, langue: str = "fr") -> str:
     if octets <= 0:
         return ""

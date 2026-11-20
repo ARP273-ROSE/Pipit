@@ -281,6 +281,7 @@ def _lettre_systeme() -> str:
 
 
 # ------------------------------------------------------------------ interface publique
+from .modele import nettoyer_nom  # noqa: E402
 def lister() -> list[Disque]:
     """Tous les disques présents, internes compris (le tri se fait dans peripheriques.py)."""
     lettres = _lettres_par_disque()
@@ -293,7 +294,7 @@ def lister() -> list[Disque]:
                or " ".join(x for x in (desc.get("fabricant"), desc.get("modele")) if x) or f"Disque {numero}")
         disques.append(Disque(
             numero=numero,
-            nom=str(nom),
+            nom=nettoyer_nom(str(nom)),
             bus=desc.get("bus", "?"),
             taille=taille,
             lettres=[l for l, _ in vols],

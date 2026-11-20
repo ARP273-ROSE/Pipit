@@ -22,6 +22,7 @@ Kernel-PnP (événement 225), raccourcis globaux RegisterHotKey.
 
 ## Reste à faire
 
+- ✅ 20/11 : détection vérifiée sur un vrai poste (2 disques USB vus, SATA/NVMe/système/virtuel exclus).
 - Essai réel d'éjection sur un vrai poste (clé, disque, lecteur multicarte).
 - Vérifier sur un vrai poste que Win+Alt (touche de modification seule) déclenche bien.
 - L'entrée « Run » n'est pas retirée par la désinstallation (gabarit commun de l'installeur).

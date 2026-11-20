@@ -110,3 +110,10 @@ def test_reglages_abimes_ne_cassent_rien(donnees):
     donnees.mkdir(parents=True, exist_ok=True)
     (donnees / "reglages.json").write_text("{pas du json", encoding="utf-8")
     assert reglages.charger().raccourci_menu == "Win+Alt"
+
+
+def test_suffixes_de_windows_retires():
+    from pipit.modele import nettoyer_nom
+    assert nettoyer_nom("Micron CT4000X6SSD9 SCSI Disk Device") == "Micron CT4000X6SSD9"
+    assert nettoyer_nom("SanDisk Extreme Pro USB Device") == "SanDisk Extreme Pro"
+    assert nettoyer_nom("Kingston DataTraveler 3.0") == "Kingston DataTraveler 3.0"
