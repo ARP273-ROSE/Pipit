@@ -61,5 +61,6 @@
   "nom_affiche_en": "Pipit",
   "description_fr": "Retirer une clé ou un disque USB sans risque, depuis l'icône près de l'horloge",
   "description_en": "Safely remove USB drives and memory cards from the icon next to the clock",
-  "cle_publique_maj": "kHjUuLfq9BPw5+cmaBXwqFGMR4J9Jq5r0wBQLybZN0s="
+  "cle_publique_maj": "kHjUuLfq9BPw5+cmaBXwqFGMR4J9Jq5r0wBQLybZN0s=",
+  "release_unique": true
 }
