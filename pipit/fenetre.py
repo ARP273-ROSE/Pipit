@@ -16,6 +16,7 @@ COL_LETTRES, COL_ICONE, COL_NOM, COL_TYPE, COL_MATERIEL, COL_TAILLE, COL_BUS, CO
 
 class FenetreReglages(QtWidgets.QWidget):
     _maj_signal = QtCore.pyqtSignal(object, bool)
+    _tache_signal = QtCore.pyqtSignal(bool)
 
     def __init__(self, zone):
         super().__init__()
@@ -24,6 +25,8 @@ class FenetreReglages(QtWidgets.QWidget):
         self.setWindowIcon(zone.icone)
         self.resize(1000, 720)
         self._maj_signal.connect(self._resultat_maj)
+        self._tache_signal.connect(self._etat_tache)
+        self._ids_affiches = None
         self._contenu = None
         QtWidgets.QVBoxLayout(self).setContentsMargins(0, 0, 0, 0)
         self._construire()
@@ -87,16 +90,17 @@ class FenetreReglages(QtWidgets.QWidget):
         gauche.addWidget(gr)
         ga = QtWidgets.QGroupBox(tr("fen.assistant"))
         al = QtWidgets.QVBoxLayout(ga)
-        self.etat_assistant = QtWidgets.QLabel("")
+        self.etat_assistant = QtWidgets.QLabel(tr("assistant.uac"))
         self.etat_assistant.setWordWrap(True)
         al.addWidget(self.etat_assistant)
-        self.b_assistant = QtWidgets.QPushButton("")
-        self.b_assistant.clicked.connect(self._basculer_assistant)
+        self.b_assistant = QtWidgets.QPushButton(tr("assistant.retirer_ancienne"))
+        self.b_assistant.clicked.connect(self._retirer_ancienne_tache)
+        self.b_assistant.setVisible(False)
         al.addWidget(self.b_assistant)
         gauche.addWidget(ga)
         gauche.addStretch(1)
         bas.addLayout(gauche, 1)
-        self._etat_assistant()
+        self._verifier_ancienne_tache()
 
         go = QtWidgets.QGroupBox(tr("fen.options"))
         ol = QtWidgets.QVBoxLayout(go)
@@ -186,6 +190,7 @@ class FenetreReglages(QtWidgets.QWidget):
     # ------------------------------------------------------------ périphériques
     def rafraichir(self) -> None:
         self._remplissage = True
+        self._ids_affiches = sorted(p.id for p in self.zone._derniers)
         perifs = self.zone.lister(avec_masques=True)
         self.table.setRowCount(len(perifs))
         for i, p in enumerate(perifs):
@@ -230,6 +235,11 @@ class FenetreReglages(QtWidgets.QWidget):
         entete.setSectionResizeMode(COL_NOM, QtWidgets.QHeaderView.ResizeMode.ResizeToContents)
         entete.setSectionResizeMode(COL_MATERIEL, QtWidgets.QHeaderView.ResizeMode.Stretch)
         self._remplissage = False
+
+    def rafraichir_si_change(self) -> None:
+        ids = sorted(p.id for p in self.zone._derniers)
+        if ids != self._ids_affiches:
+            self.rafraichir()
 
     def _changer_type(self, materiel: str, type_: str) -> None:
         if type_:
@@ -288,21 +298,31 @@ class FenetreReglages(QtWidgets.QWidget):
         reglages.enregistrer(self.r)
         self.zone.actualiser()
 
-    # ------------------------------------------------------------ assistant administrateur
-    def _etat_assistant(self) -> None:
-        from . import assistant
-        present = assistant.installe()
-        self.etat_assistant.setText(tr("assistant.present") if present else tr("assistant.absent"))
-        self.b_assistant.setText(tr("assistant.retirer") if present else tr("assistant.installer"))
-        self.b_assistant.setEnabled(systeme.WINDOWS)
+    # ------------------------------------------------------------ ancienne tâche de la 0.2.0
+    def _verifier_ancienne_tache(self) -> None:
+        """schtasks prend du temps : en arrière-plan, jamais dans le fil de l'interface."""
+        def travail():
+            from . import assistant
+            present = assistant.ancienne_tache_presente()
+            self._tache_signal.emit(present)
+        threading.Thread(target=travail, daemon=True, name="pipit-tache").start()
 
-    def _basculer_assistant(self) -> None:
-        from . import assistant
-        if assistant.installe():
-            assistant.desinstaller()
-        elif not assistant.installer():
-            QtWidgets.QMessageBox.warning(self, systeme.NOM, tr("admin.uac_refuse"))
-        self._etat_assistant()
+    def _etat_tache(self, present: bool) -> None:
+        try:
+            self.b_assistant.setVisible(bool(present))
+            if present:
+                self.etat_assistant.setText(tr("assistant.ancienne"))
+        except RuntimeError:                            # fenêtre reconstruite entre-temps
+            pass
+
+    def _retirer_ancienne_tache(self) -> None:
+        self.b_assistant.setEnabled(False)
+
+        def travail():
+            from . import assistant
+            assistant.retirer_ancienne_tache()
+            self._tache_signal.emit(assistant.ancienne_tache_presente())
+        threading.Thread(target=travail, daemon=True, name="pipit-tache").start()
 
     def _changer_theme(self) -> None:
         self.r.theme = self.cb_theme.currentData() or "sombre"

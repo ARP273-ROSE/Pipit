@@ -82,13 +82,20 @@ def test_choix_proposes_tous_valides():
 
 
 def test_journal_225_lu_quels_que_soient_les_champs():
-    evs = [{"donnees": {"ProcessId": "1234", "ProcessName": "\\Device\\HarddiskVolume3\\Windows\\explorer.exe",
-                        "DeviceInstance": "USB\\VID_0951"}},
-           {"donnees": {"Param1": "\\Device\\HarddiskVolume3\\Tools\\vlc.exe", "Param2": "5678"}}]
+    evs = [{"donnees": {"ProcessId": "1234", "ProcessName": "\\Device\\HarddiskVolume3\\Windows\\explorer.exe"}},
+           {"donnees": {"ProcessID": "5678", "Application": "\\Device\\HarddiskVolume3\\Tools\\vlc.exe"}},
+           {"donnees": {"Param1": "\\Device\\HarddiskVolume3\\Tools\\autre.exe", "Param2": "999"}}]
     bs = bloqueurs.analyser(evs)
-    assert [(b.pid, b.programme) for b in bs] == [(1234, "explorer.exe"), (5678, "vlc.exe")]
+    assert [(b.pid, b.programme) for b in bs] == [(1234, "explorer.exe"), (5678, "vlc.exe")]  # pas de pid deviné
     assert bs[0].explorateur and not bs[0].fermable
     assert bs[1].fermable
+
+
+def test_journal_225_seulement_pour_ce_peripherique():
+    evs = [{"donnees": {"ProcessId": "1", "ProcessName": "C:\\a.exe", "DeviceInstance": "USB\\VID_0951&PID_1666\\BB02"}},
+           {"donnees": {"ProcessId": "2", "ProcessName": "C:\\b.exe", "DeviceInstance": "USB\\VID_0781&PID_558C\\AA01"}}]
+    bs = bloqueurs.analyser(evs, ids=["USB\\VID_0781&PID_558C\\AA01"])
+    assert [b.programme for b in bs] == ["b.exe"]
 
 
 def test_antivirus_jamais_ferme():
@@ -170,26 +177,24 @@ def test_coupables():
 
 def test_assistant_refuse_les_demandes_douteuses():
     from pipit import assistant
-    assert not assistant.demander("formater", "USB\\VID_1")["ok"]
+    assert not assistant.demander("formater", "USB\\VID_1&PID_2\\3")["ok"]
     assert not assistant.demander("forcer", "C:\\Windows & del")["ok"]
-    assert assistant._traiter({"action": "rm", "id": "USB\\X"})["detail"] == "demande invalide"
+    assert not assistant.demander("forcer", "USB")["ok"]                  # identifiant tronqué
+    assert not assistant.demander("fermer_fichiers", "USB\\VID_1&PID_2\\3")["ok"]   # action supprimée
+    assert assistant.traiter("rm", "USB\\VID_1&PID_2\\3")["detail"] == "demande invalide"
 
 
-def test_assistant_tache_xml():
+def test_assistant_arguments_stricts():
     from pipit import assistant
-    xml = assistant.xml_tache()
-    assert "HighestAvailable" in xml and "--assistant" in xml and "<Triggers>" not in xml
+    assert assistant.executer([]) == 2
+    assert assistant.executer(["forcer", "USB\\VID_1&PID_2\\3", "\\\\.\\pipe\\autre", "00" * 32]) == 2
+    assert assistant.executer(["forcer", "USB\\VID_1&PID_2\\3", "\\\\.\\pipe\\pipit-" + "a" * 32, "zz"]) == 2
 
 
-def test_assistant_traite_ses_fichiers(donnees):
-    import json
-    from pipit import assistant
-    d = assistant.dossier() / "demande-essai.json"
-    d.write_text(json.dumps({"action": "coupables", "id": "USB\\VID_0781&PID_558C\\AA01", "lettres": ["E"]}),
-                 encoding="utf-8")
-    assert assistant.executer() == 0
-    r = json.loads((assistant.dossier() / "reponse-essai.json").read_text(encoding="utf-8"))
-    assert r["ok"] and r["coupables"][0]["programme"] == "WINWORD.EXE"
+def test_remonter_seulement_un_peripherique_ejecte():
+    """Un périphérique pas éjecté (désactivé exprès, par exemple) n'est jamais réactivé."""
+    p = peripheriques.lister()[0]
+    assert peripheriques.remonter(p.id)["ok"] is False
 
 
 def test_nom_retenu_apres_ejection(monkeypatch):

@@ -19,6 +19,7 @@ def zone(app):
     definir_langue("fr")
     from pipit.zone import Zone
     z = Zone(app)
+    z.actualiser(attendre=True)            # la liste se lit en arrière-plan : on attend la première
     yield z
     z.minuteur.stop()
     z.raccourcis.tout_retirer()
@@ -61,6 +62,7 @@ def test_remontage_dans_le_menu(app, zone):
     p = [p for p in zone.lister() if "VID_0951" in p.id][0]
     zone.ejecter(p)
     assert attendre(app, lambda: not zone.en_cours)
+    zone.actualiser(attendre=True)
     zone.construire_menu(zone.menu, complet=False)
     textes = _textes(zone.menu)
     assert tr("zone.remonter_titre") in textes
@@ -99,6 +101,7 @@ def test_type_et_icone_personnalises(app, zone, tmp_path):
 
 def test_nom_choisi_dans_le_menu(zone):
     zone.reglages.noms["USB\\VID_0781&PID_558C"] = "Sauvegarde photo"
+    zone.actualiser(attendre=True)
     zone.construire_menu(zone.menu, complet=False)
     assert any("Sauvegarde photo" in t for t in _textes(zone.menu))
 
@@ -120,6 +123,7 @@ def test_reglages_nom_et_masque(app, zone):
     r = reglages.charger()
     assert r.noms == {"USB\\VID_0781&PID_558C": "Ma sauvegarde"}
     assert r.masques == ["USB\\VID_0781&PID_558C"]
+    zone.actualiser(attendre=True)
     zone.construire_menu(zone.menu, complet=False)
     assert not any("Ma sauvegarde" in t for t in _textes(zone.menu))
     f.close()

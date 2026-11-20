@@ -108,8 +108,8 @@ apparaît : vous pouvez retirer le câble.
 Un périphérique éjecté mais pas encore débranché apparaît en bas du menu, sous
 « Éjectés, encore branchés ». \menu{Remonter …} le rend de nouveau utilisable, sans
 toucher au câble. Cela marche aussi pour un périphérique éjecté par Windows ou par un
-autre logiciel. Windows n'accepte ce geste qu'avec les droits d'administrateur : voir
-l'assistant, section~\ref{sec:assistant}.
+autre logiciel. Windows n'accepte ce geste qu'avec les droits d'administrateur (fenêtre de confirmation de Windows) : voir
+section~\ref{sec:assistant}.
 
 \section{Quand Windows refuse}\label{sec:refus}
 
@@ -124,6 +124,8 @@ Pipit croise deux sources : le journal de Windows, et la liste des fichiers ouve
 vos programmes, avec leur chemin.
 
 \begin{itemize}
+\item \menu{Montrer …} met la fenêtre du programme au premier plan : enregistrez,
+  fermez le document, puis \menu{Réessayer}.
 \item \menu{Fermer …} demande poliment au programme de se fermer, exactement comme la
   croix de sa fenêtre : s'il a un document non enregistré, il vous le proposera. Pipit
   réessaie ensuite tout seul.
@@ -169,6 +171,16 @@ confirmation à chaque fois. Ce geste demande les droits d'administrateur
 \item installer un pilote ou un service permanent.
 \end{itemize}
 \end{securitebox}
+
+\section{Lecteurs CD/DVD et images ISO}
+\begin{itemize}
+\item \textbf{Lecteur CD/DVD}, interne ou externe : un clic \emph{ouvre le tiroir}, comme
+  le bouton du lecteur. \menu{Fermer le tiroir} (clic droit) le referme, si le lecteur le
+  permet (les lecteurs de portable, à fente ou à ressort, ne savent pas se refermer seuls).
+\item \textbf{Image ISO ou disque virtuel VHD} montés (double-clic sur un fichier
+  \fichier{.iso}) : un clic les \emph{démonte}. La lettre disparaît, le fichier reste.
+\item « Tout éjecter » n'ouvre aucun tiroir et ne démonte aucune image.
+\end{itemize}
 
 \section{Lecteurs de cartes à plusieurs fentes}
 
@@ -220,6 +232,7 @@ choisissez-en un autre.
   d'éjecter un disque interne par erreur ; cochez seulement si vous avez un tiroir
   ou une baie extractible.
 \item \textbf{Montrer téléphones, tablettes et appareils photo}.
+\item \textbf{Montrer les lecteurs CD/DVD et les images ISO/VHD}.
 \item \textbf{Nombre de périphériques sur l'icône}.
 \item \textbf{Rappeler les périphériques oubliés à la fermeture de session} : à l'arrêt du
   PC, Pipit propose de tout éjecter s'il reste quelque chose de branché.
@@ -228,13 +241,17 @@ choisissez-en un autre.
 \item \textbf{Thème} : sombre ou clair, au choix (Windows ne décide pas à votre place).
 \end{itemize}
 
-\subsection{Assistant administrateur}\label{sec:assistant}
-Remonter un périphérique, forcer une éjection et chercher les coupables parmi les
-programmes de Windows demandent les droits d'administrateur. Sans assistant, Windows
-demande confirmation (fenêtre UAC) à chaque fois. \menu{Installer l'assistant} crée une
-tâche planifiée « Pipit\textbackslash Assistant » (une seule confirmation) : ensuite, plus
-rien n'est redemandé. Elle ne tourne que le temps d'un geste demandé, ne fait que ces trois
-choses, et se retire d'un clic.
+\subsection{Droits d'administrateur}\label{sec:assistant}
+Remonter un périphérique, forcer une éjection et « Chercher partout » demandent les droits
+d'administrateur : Windows affiche sa fenêtre de confirmation (UAC) à chaque fois. C'est
+voulu. Pipit n'installe ni service ni tâche permanente qui garderait ces droits : aucun
+autre programme ne peut donc s'en servir en cachette. La partie administrateur ne reçoit
+que le geste et l'identifiant du périphérique ; elle vérifie elle-même qu'il s'agit bien
+d'un périphérique externe (ou éjecté encore branché, pour un remontage) et refuse tout le
+reste.
+
+\attention{La version 0.2.0 installait une tâche planifiée « Pipit\textbackslash Assistant »
+qui s'est révélée risquée. Si elle est encore là, les réglages proposent de la retirer.}
 
 \section{Mises à jour et rapports d'incident}
 

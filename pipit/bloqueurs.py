@@ -58,12 +58,21 @@ class Bloqueur:
         return self.programme.lower() == "explorer.exe"
 
 
-def analyser(evenements: list[dict]) -> list[Bloqueur]:
+def analyser(evenements: list[dict], ids: list[str] | None = None) -> list[Bloqueur]:
     """Extrait (pid, programme) des événements 225, quels que soient les noms des champs
-    (ils ont changé d'une version de Windows à l'autre)."""
+    (ils ont changé d'une version de Windows à l'autre). Avec `ids`, ne garde que les
+    événements qui citent ce périphérique (un autre périphérique éjecté au même moment
+    ne doit pas désigner son propre coupable). Jamais de numéro de programme deviné."""
+    ids_maj = [i.upper() for i in (ids or []) if i]
     trouves: dict[int, Bloqueur] = {}
     for ev in evenements or []:
         donnees = ev.get("donnees") or {}
+        valeurs = [str(v or "") for v in donnees.values()]
+        if ids_maj and any("\\" in v and "_" in v for v in valeurs):
+            # l'événement cite un périphérique : est-ce le nôtre (ou un de ses enfants) ?
+            if not any(v.upper().startswith(i) or i.startswith(v.upper()) for v in valeurs
+                       for i in ids_maj if "\\" in v and len(v) > 8):
+                continue
         chemin, pid = "", 0
         for nom, valeur in donnees.items():
             v = str(valeur or "")
@@ -71,10 +80,7 @@ def analyser(evenements: list[dict]) -> list[Bloqueur]:
                 chemin = v
             elif "process" in str(nom).lower() and "id" in str(nom).lower() and v.isdigit():
                 pid = int(v)
-        if not pid:
-            nombres = [int(str(v)) for v in donnees.values() if str(v or "").isdigit()]
-            pid = nombres[0] if nombres else 0
-        if chemin or pid:
+        if chemin and pid:
             nom_exe = chemin.replace("/", "\\").rsplit("\\", 1)[-1] or "?"
             trouves[pid] = Bloqueur(pid, nom_exe, chemin)
     return list(trouves.values())
@@ -84,7 +90,7 @@ def _sans_console() -> dict:
     return {"creationflags": 0x08000000} if sys.platform == "win32" else {}
 
 
-def chercher(depuis: float, lettres: list[str] | None = None) -> list[Bloqueur]:
+def chercher(depuis: float, lettres: list[str] | None = None, ids: list[str] | None = None) -> list[Bloqueur]:
     if os.environ.get("PIPIT_DEMO") == "1" or sys.platform != "win32":
         from . import demo
         return demo.bloqueurs()
@@ -99,7 +105,7 @@ def chercher(depuis: float, lettres: list[str] | None = None) -> list[Bloqueur]:
         return []
     if isinstance(evenements, dict):
         evenements = [evenements]
-    return analyser(evenements)
+    return analyser(evenements, ids)
 
 
 def fermer(b: Bloqueur) -> bool:

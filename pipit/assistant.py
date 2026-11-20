@@ -1,81 +1,77 @@
-"""Assistant administrateur : remonter, forcer l'éjection, chercher les coupables partout.
+"""Gestes administrateur : remonter, forcer l'éjection, chercher les coupables partout.
 
-USB Safely Remove a un service système pour ces gestes. Pipit utilise une tâche planifiée
-« Pipit\\Assistant », créée une fois (une fenêtre UAC) avec les privilèges les plus élevés
-de l'utilisateur : la lancer ensuite (schtasks /run) ne redemande rien. Elle ne tourne que
-le temps d'une demande, puis s'arrête.
+Conception (après audit de sécurité de la 0.2.0) :
 
-Échange par fichiers dans le dossier des données (le même utilisateur) :
-    assistant/demande-<n>.json   {"action": ..., "id": ..., "lettres": [...]}
-    assistant/reponse-<n>.json
-L'assistant n'exécute que trois actions fixes, sur un identifiant de périphérique
-vérifié : jamais une commande venue du fichier.
-
-Sans la tâche (refusée, ou poste sans droits), chaque geste passe par une fenêtre UAC.
+* AUCUNE tâche planifiée ni service : chaque geste passe par une fenêtre UAC. Une tâche à
+  privilèges élevés qui lance du code installé dans le profil de l'utilisateur serait un
+  contournement permanent de l'UAC : n'importe quel programme de la session pourrait
+  modifier ce code puis lancer la tâche.
+* Aucun fichier d'échange : Pipit ouvre un canal nommé au nom aléatoire et le processus
+  élevé y répond. Les deux côtés s'authentifient par une clé aléatoire à usage unique
+  (défi HMAC de multiprocessing.connection), transmise sur la ligne de commande du
+  processus élevé, illisible pour un processus non élevé.
+* Le processus élevé ne croit pas ce qu'on lui envoie : il ne reçoit qu'une action et un
+  identifiant de périphérique, recalcule lui-même le périphérique et ses lettres, et
+  refuse tout ce qui n'est pas un périphérique externe éjectable (forcer, coupables) ou
+  un périphérique éjecté encore branché, problème 47 (remonter).
 """
 from __future__ import annotations
 
 import ctypes
-import json
 import os
 import re
+import secrets
 import subprocess
 import sys
-import time
-import uuid
+import threading
 from pathlib import Path
 
 from . import systeme
 
-TACHE = "Pipit\\Assistant"
-ACTIONS = ("remonter", "forcer", "coupables", "fermer_fichiers")
-_ID_VALIDE = re.compile(r"^(USB|USBSTOR|SCSI|SD|SWD|STORAGE|PCI|HID|BTHENUM|1394|SBP2)[\\\w&#.{}\-]*$", re.I)
+ANCIENNE_TACHE = "Pipit\\Assistant"          # créée par la 0.2.0 : retirée dès que possible
+ACTIONS = ("remonter", "forcer", "coupables")
+_ID_VALIDE = re.compile(r"^(USB|USBSTOR|SCSI|SD|STORAGE|1394|SBP2)\\[\w&#.{}\-\\]{3,200}$", re.I)
+_CANAL = re.compile(r"^\\\\\.\\pipe\\pipit-[0-9a-f]{32}$")
 
 
-def dossier() -> Path:
-    d = systeme.dossier_donnees() / "assistant"
-    d.mkdir(parents=True, exist_ok=True)
-    return d
+def id_valide(ident: str) -> bool:
+    return bool(_ID_VALIDE.match(ident or ""))
 
 
 def _sans_console() -> dict:
     return {"creationflags": 0x08000000} if sys.platform == "win32" else {}
 
 
-def _commande() -> tuple[str, str]:
-    script = Path(__file__).resolve().parent.parent / "run.py"
-    return systeme.executable_fenetre(), subprocess.list2cmdline([str(script), "--assistant"])
-
-
-# ------------------------------------------------------------------ installation de la tâche
-def installe() -> bool:
+def est_admin() -> bool:
     if sys.platform != "win32":
         return False
-    r = subprocess.run(["schtasks", "/query", "/tn", TACHE], capture_output=True, **_sans_console())
-    return r.returncode == 0
+    try:
+        return bool(ctypes.windll.shell32.IsUserAnAdmin())
+    except Exception:                               # noqa: BLE001
+        return False
 
 
-def xml_tache() -> str:
-    exe, args = _commande()
-    dossier_app = str(Path(__file__).resolve().parent.parent)
-    from xml.sax.saxutils import escape
-    return f"""<?xml version="1.0" encoding="UTF-16"?>
-<Task version="1.2" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
-  <RegistrationInfo><Description>Pipit : remonter un périphérique, forcer une éjection (sur demande seulement).</Description></RegistrationInfo>
-  <Principals><Principal id="Author"><LogonType>InteractiveToken</LogonType><RunLevel>HighestAvailable</RunLevel></Principal></Principals>
-  <Settings>
-    <MultipleInstancesPolicy>Queue</MultipleInstancesPolicy>
-    <DisallowStartIfOnBatteries>false</DisallowStartIfOnBatteries>
-    <StopIfGoingOnBatteries>false</StopIfGoingOnBatteries>
-    <AllowStartOnDemand>true</AllowStartOnDemand>
-    <ExecutionTimeLimit>PT5M</ExecutionTimeLimit>
-    <Priority>5</Priority>
-  </Settings>
-  <Actions Context="Author"><Exec><Command>{escape(exe)}</Command><Arguments>{escape(args)}</Arguments><WorkingDirectory>{escape(dossier_app)}</WorkingDirectory></Exec></Actions>
-</Task>
-"""
+# ------------------------------------------------------------------ ancienne tâche (0.2.0)
+def ancienne_tache_presente() -> bool:
+    if sys.platform != "win32":
+        return False
+    try:
+        r = subprocess.run(["schtasks", "/query", "/tn", ANCIENNE_TACHE], capture_output=True, timeout=15,
+                           **_sans_console())
+        return r.returncode == 0
+    except (OSError, subprocess.SubprocessError):
+        return False
 
 
+def retirer_ancienne_tache() -> bool:
+    """La tâche de la 0.2.0 est un risque : on la supprime (une fenêtre UAC)."""
+    if not ancienne_tache_presente():
+        return True
+    _executer_eleve("schtasks", subprocess.list2cmdline(["/delete", "/f", "/tn", ANCIENNE_TACHE]), 60)
+    return not ancienne_tache_presente()
+
+
+# ------------------------------------------------------------------ élévation
 def _executer_eleve(programme: str, parametres: str, attendre: float = 120.0) -> int | None:
     """ShellExecuteEx « runas » : une fenêtre UAC ; renvoie le code de sortie (None = refusé)."""
     from ctypes import wintypes
@@ -90,115 +86,123 @@ def _executer_eleve(programme: str, parametres: str, attendre: float = 120.0) ->
 
     info = SHELLEXECUTEINFOW()
     info.cbSize = ctypes.sizeof(info)
-    info.fMask = 0x40                                  # SEE_MASK_NOCLOSEPROCESS
+    info.fMask = 0x40 | 0x400                          # NOCLOSEPROCESS | FLAG_NO_UI (pas de boîte d'erreur)
     info.lpVerb, info.lpFile, info.lpParameters, info.nShow = "runas", programme, parametres, 0
-    if not ctypes.windll.shell32.ShellExecuteExW(ctypes.byref(info)) or not info.hProcess:
+    shell32 = ctypes.WinDLL("shell32", use_last_error=True)
+    shell32.ShellExecuteExW.argtypes = [ctypes.POINTER(SHELLEXECUTEINFOW)]
+    if not shell32.ShellExecuteExW(ctypes.byref(info)) or not info.hProcess:
         return None
-    k32 = ctypes.windll.kernel32
-    k32.WaitForSingleObject(wintypes.HANDLE(info.hProcess), int(attendre * 1000))
+    k32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    k32.WaitForSingleObject.argtypes = [wintypes.HANDLE, wintypes.DWORD]
+    k32.GetExitCodeProcess.argtypes = [wintypes.HANDLE, ctypes.POINTER(wintypes.DWORD)]
+    k32.CloseHandle.argtypes = [wintypes.HANDLE]
+    k32.WaitForSingleObject(info.hProcess, int(attendre * 1000))
     code = wintypes.DWORD(1)
-    k32.GetExitCodeProcess(wintypes.HANDLE(info.hProcess), ctypes.byref(code))
-    k32.CloseHandle(wintypes.HANDLE(info.hProcess))
+    k32.GetExitCodeProcess(info.hProcess, ctypes.byref(code))
+    k32.CloseHandle(info.hProcess)
     return code.value
 
 
-def installer() -> bool:
-    """Crée la tâche (une fenêtre UAC). True si elle existe ensuite."""
-    if sys.platform != "win32":
-        return False
-    xml = dossier() / "tache.xml"
-    xml.write_text(xml_tache(), encoding="utf-16")
-    _executer_eleve("schtasks", subprocess.list2cmdline(["/create", "/f", "/tn", TACHE, "/xml", str(xml)]), 60)
-    return installe()
-
-
-def desinstaller() -> bool:
-    if not installe():
-        return True
-    _executer_eleve("schtasks", subprocess.list2cmdline(["/delete", "/f", "/tn", TACHE]), 60)
-    return not installe()
-
-
 # ------------------------------------------------------------------ côté Pipit : demander
-def demander(action: str, ident: str, lettres: list[str] | None = None, delai: float = 90.0) -> dict:
-    """Envoie une demande à l'assistant et attend sa réponse."""
-    if action not in ACTIONS or not _ID_VALIDE.match(ident or ""):
+_un_a_la_fois = threading.Lock()
+
+
+def demander(action: str, ident: str, delai: float = 120.0) -> dict:
+    """Lance le processus élevé (fenêtre UAC) et attend sa réponse par le canal privé."""
+    if action not in ACTIONS or not id_valide(ident):
         return {"ok": False, "detail": "demande invalide"}
     if os.environ.get("PIPIT_DEMO") == "1" or sys.platform != "win32":
         from . import demo
-        return demo.assistant(action, ident, lettres or [])
-    n = uuid.uuid4().hex
-    demande = dossier() / f"demande-{n}.json"
-    reponse = dossier() / f"reponse-{n}.json"
-    demande.write_text(json.dumps({"action": action, "id": ident, "lettres": lettres or []}), encoding="utf-8")
-    lance = False
-    if installe():
-        r = subprocess.run(["schtasks", "/run", "/tn", TACHE], capture_output=True, **_sans_console())
-        lance = r.returncode == 0
-    if not lance:
-        exe, args = _commande()
-        code = _executer_eleve(exe, args + " " + subprocess.list2cmdline([str(demande)]), delai)
-        if code is None:
-            demande.unlink(missing_ok=True)
-            return {"ok": False, "detail": "uac_refuse"}
-    fin = time.time() + delai
-    while time.time() < fin:
-        if reponse.exists():
+        return demo.assistant(action, ident)
+    from multiprocessing.connection import Client, Listener
+    with _un_a_la_fois:
+        canal = "\\\\.\\pipe\\pipit-" + secrets.token_hex(16)
+        cle = secrets.token_bytes(32)
+        try:
+            ecoute = Listener(address=canal, family="AF_PIPE", authkey=cle)
+        except OSError as exc:
+            return {"ok": False, "detail": f"canal: {exc}"}
+        reponse: dict = {}
+
+        def attendre_reponse():
             try:
-                donnees = json.loads(reponse.read_text(encoding="utf-8"))
-                reponse.unlink(missing_ok=True)
-                return donnees
-            except (OSError, ValueError):
+                with ecoute.accept() as conn:
+                    if conn.poll(delai):
+                        donnees = conn.recv()
+                        if isinstance(donnees, dict):
+                            reponse.update(donnees)
+            except Exception:                       # noqa: BLE001 — authentification ratée, canal coupé
                 pass
-        time.sleep(0.3)
-    demande.unlink(missing_ok=True)
-    return {"ok": False, "detail": "delai"}
+
+        fil = threading.Thread(target=attendre_reponse, daemon=True, name="pipit-canal")
+        fil.start()
+        script = Path(__file__).resolve().parent.parent / "run.py"
+        args = subprocess.list2cmdline([str(script), "--assistant", action, ident, canal, cle.hex()])
+        code = _executer_eleve(systeme.executable_fenetre(), args, delai)
+        if fil.is_alive():                           # personne ne s'est connecté : on débloque accept()
+            try:
+                Client(canal, family="AF_PIPE", authkey=cle).close()
+            except Exception:                       # noqa: BLE001
+                pass
+            fil.join(2)
+        ecoute.close()
+        if code is None:
+            return {"ok": False, "detail": "uac_refuse"}
+        return reponse or {"ok": False, "detail": f"sans réponse (code {code})"}
 
 
-# ------------------------------------------------------------------ côté assistant : exécuter
-def _traiter(d: dict) -> dict:
-    action, ident, lettres = d.get("action"), str(d.get("id", "")), [str(l)[:1].upper() for l in d.get("lettres", [])]
-    if action not in ACTIONS or not _ID_VALIDE.match(ident):
+# ------------------------------------------------------------------ côté élevé : exécuter
+def _peripherique(ident: str, exiger_lettres: bool):
+    """Recalcule le périphérique à partir de l'identifiant seul : jamais les lettres reçues."""
+    from . import disques_windows, peripheriques
+    from .modele import regrouper
+    for p in regrouper(disques_windows.lister()):
+        if p.id.upper() != ident.upper():
+            continue
+        if any(d.systeme for d in p.disques) or p.bus not in peripheriques.BUS_EXTERNES or p.geste != "ejecter":
+            return None
+        if exiger_lettres and not p.lettres:
+            return None
+        return p
+    return None
+
+
+def traiter(action: str, ident: str) -> dict:
+    if action not in ACTIONS or not id_valide(ident):
         return {"ok": False, "detail": "demande invalide"}
-    lettres = [l for l in lettres if l.isalpha()]
-    if action in ("coupables", "fermer_fichiers"):
-        from . import poignees
-        trouves = poignees.chercher(lettres, fermer=(action == "fermer_fichiers"))
-        if trouves is None:
-            return {"ok": False, "detail": "delai"}
-        return {"ok": True, "coupables": [c.__dict__ for c in trouves]}
-    from . import admin_windows
+    if action == "remonter":
+        from . import admin_windows
+        if not admin_windows.en_attente_de_retrait(ident):
+            return {"ok": False, "detail": "etat"}       # jamais un périphérique désactivé exprès
+        return admin_windows.remonter(ident)
+    p = _peripherique(ident, exiger_lettres=(action == "coupables"))
+    if p is None:
+        return {"ok": False, "detail": "peripherique"}
     if action == "forcer":
-        return admin_windows.forcer(ident, lettres)
-    return admin_windows.remonter(ident)
+        from . import admin_windows
+        return admin_windows.forcer(p.id, p.lettres)
+    from . import poignees
+    trouves = poignees.chercher(p.lettres)
+    if trouves is None:
+        return {"ok": False, "detail": "delai"}
+    return {"ok": True, "coupables": [c.__dict__ for c in trouves]}
 
 
-def executer(fichier: str | None = None) -> int:
-    """Point d'entrée de l'assistant (run.py --assistant) : traite les demandes en attente."""
-    fichiers = [Path(fichier)] if fichier else sorted(dossier().glob("demande-*.json"))
-    for f in fichiers:
-        if not f.name.startswith("demande-") or f.parent.resolve() != dossier().resolve():
-            continue
-        try:
-            d = json.loads(f.read_text(encoding="utf-8"))
-        except (OSError, ValueError):
-            continue
-        f.unlink(missing_ok=True)
-        try:
-            r = _traiter(d)
-        except Exception as exc:                    # noqa: BLE001
-            r = {"ok": False, "detail": f"{type(exc).__name__}: {exc}"}
-        reponse = f.with_name(f.name.replace("demande-", "reponse-"))
-        tmp = reponse.with_suffix(".tmp")
-        tmp.write_text(json.dumps(r, ensure_ascii=False), encoding="utf-8")
-        tmp.replace(reponse)
-    return 0
-
-
-def est_admin() -> bool:
-    if sys.platform != "win32":
-        return False
+def executer(arguments: list[str]) -> int:
+    """run.py --assistant <action> <identifiant> <canal> <clé> : processus élevé, une seule demande."""
+    if len(arguments) != 4:
+        return 2
+    action, ident, canal, cle_hex = arguments
+    if not _CANAL.match(canal) or not re.fullmatch(r"[0-9a-f]{64}", cle_hex):
+        return 2
     try:
-        return bool(ctypes.windll.shell32.IsUserAnAdmin())
-    except Exception:                               # noqa: BLE001
-        return False
+        r = traiter(action, ident)
+    except Exception as exc:                        # noqa: BLE001
+        r = {"ok": False, "detail": f"{type(exc).__name__}: {exc}"}
+    from multiprocessing.connection import Client
+    try:
+        with Client(canal, family="AF_PIPE", authkey=bytes.fromhex(cle_hex)) as conn:
+            conn.send(r)
+    except Exception:                               # noqa: BLE001 — Pipit a abandonné entre-temps
+        return 3
+    return 0 if r.get("ok") else 1

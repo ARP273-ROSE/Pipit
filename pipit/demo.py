@@ -79,8 +79,11 @@ def en_attente_de_retrait() -> list[tuple[str, str]]:
     return list(_en_attente.items())
 
 
-def assistant(action: str, ident: str, lettres: list[str]) -> dict:
+def assistant(action: str, ident: str) -> dict:
+    lettres = [l for d in _DISQUES if d.id_ejectable == ident for l in d.lettres]
     if action == "remonter":
+        if ident not in _en_attente:
+            return {"ok": False, "detail": "etat"}
         _retires.discard(ident)
         _en_attente.pop(ident, None)
         return {"ok": True, "methode": "demo"}

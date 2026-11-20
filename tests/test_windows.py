@@ -104,29 +104,17 @@ def test_coupable_trouve_par_les_poignees(tmp_path):
         proc.kill()
 
 
-def test_assistant_tache_creee_puis_retiree():
-    """Les machines de GitHub sont administrateur : la vraie tâche planifiée se crée."""
+def test_ancienne_tache_detectee_puis_retiree():
+    """La tâche de la 0.2.0 (risque de sécurité) est retrouvée et supprimée."""
+    import subprocess
     from pipit import assistant
     if not assistant.est_admin():
         pytest.skip("pas administrateur")
-    try:
-        assert assistant.installer(), "tâche non créée"
-        assert assistant.installe()
-    finally:
-        assistant.desinstaller()
-    assert not assistant.installe()
-
-
-def test_assistant_repond_par_fichier():
-    """Demande « coupables » traitée par le vrai code de l'assistant (sans la tâche)."""
-    import json
-    from pipit import assistant
-    d = assistant.dossier() / "demande-ci.json"
-    d.write_text(json.dumps({"action": "coupables", "id": "USB\\VID_0000&PID_0000\\X", "lettres": ["C"]}),
-                 encoding="utf-8")
-    assert assistant.executer() == 0
-    r = json.loads((assistant.dossier() / "reponse-ci.json").read_text(encoding="utf-8"))
-    assert r["ok"], r
+    subprocess.run(["schtasks", "/create", "/f", "/tn", assistant.ANCIENNE_TACHE, "/tr", "cmd /c exit",
+                    "/sc", "once", "/st", "23:59"], capture_output=True)
+    assert assistant.ancienne_tache_presente()
+    assert assistant.retirer_ancienne_tache()
+    assert not assistant.ancienne_tache_presente()
 
 
 # ------------------------------------------------------------ 0.3.0
@@ -167,3 +155,31 @@ def test_image_vhd_vue_puis_demontee(tmp_path):
 def test_tiroir_sans_lecteur_ne_plante_pas():
     from pipit import disques_windows
     assert disques_windows.ouvrir_tiroir("Q") is False or True
+
+
+def test_canal_prive_aller_retour():
+    """Le côté élevé (sans UAC ici) répond par le canal authentifié ; une mauvaise clé est refusée."""
+    import secrets
+    import threading
+    from multiprocessing.connection import Listener
+    from pipit import assistant
+    canal = "\\\\.\\pipe\\pipit-" + secrets.token_hex(16)
+    cle = secrets.token_bytes(32)
+    recu = {}
+    with Listener(address=canal, family="AF_PIPE", authkey=cle) as ecoute:
+        def accepter():
+            with ecoute.accept() as conn:
+                recu.update(conn.recv())
+        fil = threading.Thread(target=accepter, daemon=True)
+        fil.start()
+        code = assistant.executer(["coupables", "USB\\VID_FFFF&PID_FFFF\\INEXISTANT", canal, cle.hex()])
+        fil.join(10)
+    assert code == 1 and recu == {"ok": False, "detail": "peripherique"}
+
+
+def test_disque_interne_jamais_force():
+    from pipit import assistant, disques_windows
+    for d in disques_windows.lister():
+        if d.id_ejectable:
+            continue
+        assert assistant.traiter("forcer", d.id_disque or "USB\\VID_0000&PID_0000\\X")["ok"] is False

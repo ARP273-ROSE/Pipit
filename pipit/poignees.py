@@ -3,8 +3,9 @@
 Sans pilote : NtQuerySystemInformation(SystemExtendedHandleInformation) liste toutes les
 poignées du système ; on garde celles de type « fichier », on les copie chez nous
 (DuplicateHandle) et on demande leur chemin (GetFinalPathNameByHandleW). Sans droits
-d'administrateur on ne voit que ses propres programmes ; l'assistant administrateur
-(assistant.py) voit tout, antivirus compris.
+d'administrateur on ne voit que ses propres programmes ; le processus élevé
+(assistant.py) voit tout, antivirus compris. Pipit ne referme JAMAIS une poignée d'un
+autre programme : il ne fait que lire.
 
 Certaines poignées (tubes nommés en attente) font geler les fonctions qui les
 interrogent : on les écarte par leurs droits d'accès, comme le font les outils connus,
@@ -86,18 +87,12 @@ def _entrees():
         return list(tableau)
 
 
-def _index_type_fichier(entrees) -> int | None:
-    """Type d'objet « File » : on ouvre un fichier soi-même et on le retrouve dans la liste."""
-    h = kernel32.CreateFileW(sys.executable, 0x80000000, 0x7, None, 3, 0, None)
-    if not h or h == ctypes.c_void_p(-1).value:
-        return None
-    try:
-        moi = os.getpid()
-        for e in _entrees():
-            if e.UniqueProcessId == moi and e.HandleValue == h:
-                return e.ObjectTypeIndex
-    finally:
-        kernel32.CloseHandle(h)
+def _index_type_fichier(entrees, temoin) -> int | None:
+    """Type d'objet « File » : notre propre fichier témoin, retrouvé dans l'inventaire."""
+    moi = os.getpid()
+    for e in entrees:
+        if e.UniqueProcessId == moi and e.HandleValue == temoin:
+            return e.ObjectTypeIndex
     return None
 
 
@@ -135,9 +130,15 @@ def _sur_lecteur(chemin: str, lettres: set[str]) -> bool:
     return len(c) >= 2 and c[1] == ":" and c[0].upper() in lettres
 
 
-def _chercher(lettres: set[str], fermer: bool) -> list[Coupable]:
-    entrees = _entrees()
-    type_fichier = _index_type_fichier(entrees)
+def _chercher(lettres: set[str]) -> list[Coupable]:
+    temoin = kernel32.CreateFileW(sys.executable, 0x80000000, 0x7, None, 3, 0, None)
+    if not temoin or temoin == ctypes.c_void_p(-1).value:
+        return []
+    try:
+        entrees = _entrees()                # un seul inventaire, témoin déjà ouvert
+        type_fichier = _index_type_fichier(entrees, temoin)
+    finally:
+        kernel32.CloseHandle(temoin)
     if type_fichier is None:
         return []
     moi = os.getpid()
@@ -162,12 +163,6 @@ def _chercher(lettres: set[str], fermer: bool) -> list[Coupable]:
                 exe = _nom_programme(pid)
                 c = trouves[pid] = Coupable(pid, exe.rsplit("\\", 1)[-1] or "?", exe)
             c.fichiers.append(chemin[4:] if chemin.startswith("\\\\?\\") else chemin)
-            if fermer:
-                # « fermer seulement ses fichiers sur le périphérique » : la poignée est
-                # refermée chez le programme lui-même (il peut s'en plaindre ensuite)
-                bidon = wintypes.HANDLE()
-                kernel32.DuplicateHandle(proc, e.HandleValue, None, ctypes.byref(bidon), 0, False,
-                                         DUPLICATE_CLOSE_SOURCE)
     finally:
         for h in processus.values():
             if h:
@@ -183,9 +178,12 @@ def filtrer(coupables) -> list[Coupable]:
     return sorted(garde, key=lambda c: c.programme.lower())
 
 
-def chercher(lettres: list[str], fermer: bool = False, delai: float = 20.0) -> list[Coupable] | None:
+_en_cours = threading.Lock()
+
+
+def chercher(lettres: list[str], delai: float = 20.0) -> list[Coupable] | None:
     """Programmes qui ont des fichiers ou dossiers ouverts sur ces lettres. None = pas pu
-    savoir (pas Windows, délai dépassé). `fermer` referme ces poignées (assistant seulement)."""
+    savoir (pas Windows, délai dépassé, une recherche déjà en cours)."""
     if os.environ.get("PIPIT_DEMO") == "1" or sys.platform != "win32":
         if os.environ.get("PIPIT_DEMO") == "1":
             return [Coupable(4242, "WINWORD.EXE", "C:\\Program Files\\Microsoft Office\\WINWORD.EXE",
@@ -194,13 +192,17 @@ def chercher(lettres: list[str], fermer: bool = False, delai: float = 20.0) -> l
     lettres_ok = {l.upper() for l in lettres if l}
     if not lettres_ok:
         return []
+    if not _en_cours.acquire(blocking=False):
+        return None                         # une recherche (peut-être bloquée) tourne déjà
     resultat: list = [None]
 
     def travail():
         try:
-            resultat[0] = _chercher(lettres_ok, fermer)
+            resultat[0] = _chercher(lettres_ok)
         except Exception:                       # noqa: BLE001 — mieux vaut « inconnu » qu'un plantage
             resultat[0] = None
+        finally:
+            _en_cours.release()
 
     fil = threading.Thread(target=travail, daemon=True, name="pipit-poignees")
     fil.start()

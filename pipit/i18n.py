@@ -286,14 +286,6 @@ TEXTES: dict[str, dict[str, str]] = {
     "oubli.continuer": _t("Continuer sans éjecter", "Continue without ejecting"),
     # ---- réglages
     "fen.assistant": _t("Assistant administrateur", "Administrator helper"),
-    "assistant.present": _t("Installé : remonter, forcer et chercher partout se font sans redemander.",
-                            "Installed: bringing back, forcing and searching everywhere happen without asking again."),
-    "assistant.absent": _t("Non installé : Windows demandera une confirmation (UAC) à chaque remontage, éjection "
-                           "forcée ou recherche complète. L'installer = une seule confirmation.",
-                           "Not installed: Windows will ask for confirmation (UAC) for each bring-back, forced "
-                           "ejection or full search. Installing it = a single confirmation."),
-    "assistant.installer": _t("Installer l'assistant", "Install the helper"),
-    "assistant.retirer": _t("Retirer l'assistant", "Remove the helper"),
     "opt.appareils": _t("Montrer téléphones, tablettes et appareils photo", "Show phones, tablets and cameras"),
     "opt.compteur": _t("Nombre de périphériques sur l'icône", "Number of devices on the icon"),
     "opt.rappel": _t("Rappeler les périphériques oubliés à la fermeture de session",
@@ -319,4 +311,15 @@ TEXTES: dict[str, dict[str, str]] = {
                          "“{nom}” could not be unmounted. Close the files opened from this drive, then try again."),
     "opt.optiques": _t("Montrer les lecteurs CD/DVD et les images ISO/VHD", "Show CD/DVD drives and ISO/VHD images"),
     "refus.montrer": _t("Montrer {programme}", "Show {programme}"),
+    "assistant.uac": _t("Remonter, forcer l'éjection et « Chercher partout » demandent les droits "
+                        "d'administrateur : Windows affiche sa fenêtre de confirmation à chaque fois. C'est voulu : "
+                        "aucun programme ne peut s'en servir en cachette.",
+                        "Bringing back, forcing ejection and “Search everywhere” require administrator rights: "
+                        "Windows shows its confirmation prompt every time. This is deliberate: no program can use "
+                        "them behind your back."),
+    "assistant.ancienne": _t("La tâche « Pipit\\Assistant » de la version 0.2.0 est encore installée. Elle présente "
+                             "un risque de sécurité : retirez-la (une confirmation de Windows).",
+                             "The “Pipit\\Assistant” task from version 0.2.0 is still installed. It is a security "
+                             "risk: remove it (one Windows confirmation)."),
+    "assistant.retirer_ancienne": _t("Retirer l'ancienne tâche", "Remove the old task"),
 }

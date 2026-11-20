@@ -106,7 +106,7 @@ the cable.
 A device that was ejected but not yet unplugged appears at the bottom of the menu, under
 “Ejected, still plugged in”. \menu{Bring back …} makes it usable again without touching the
 cable. This also works for a device ejected by Windows or by another program. Windows only
-allows it with administrator rights: see the helper, section~\ref{sec:assistant}.
+allows it with administrator rights (Windows confirmation prompt): see section~\ref{sec:assistant}.
 
 \section{When Windows refuses}\label{sec:refus}
 
@@ -121,6 +121,8 @@ Pipit combines two sources: the Windows log, and the list of files opened by you
 programs, with their paths.
 
 \begin{itemize}
+\item \menu{Show …} brings the program's window to the front: save, close the document,
+  then \menu{Try again}.
 \item \menu{Close …} politely asks the program to close, exactly like the cross of its
   window: if it has an unsaved document, it will offer to save it. Pipit then tries
   again on its own.
@@ -163,6 +165,16 @@ requires administrator rights (section~\ref{sec:assistant}).}
 \item install a driver or a permanent service.
 \end{itemize}
 \end{securitebox}
+
+\section{CD/DVD drives and ISO images}
+\begin{itemize}
+\item \textbf{CD/DVD drive}, internal or external: one click \emph{opens the tray}, like the
+  drive's button. \menu{Close the tray} (right click) closes it, if the drive allows it
+  (laptop slot or spring-loaded drives cannot close by themselves).
+\item \textbf{Mounted ISO image or VHD virtual disk} (double-click on an \fichier{.iso} file):
+  one click \emph{unmounts} it. The letter disappears, the file stays.
+\item “Eject all” opens no tray and unmounts no image.
+\end{itemize}
 
 \section{Multi-slot card readers}
 
@@ -211,6 +223,7 @@ pick another one.
   disks as “removable”. Pipit hides them so that an internal disk is not ejected by
   mistake; tick only if you have a removable drive bay.
 \item \textbf{Show phones, tablets and cameras}.
+\item \textbf{Show CD/DVD drives and ISO/VHD images}.
 \item \textbf{Number of devices on the icon}.
 \item \textbf{Remind about forgotten devices when signing out}: on shutdown, Pipit offers to
   eject everything if something is still plugged in.
@@ -219,12 +232,16 @@ pick another one.
 \item \textbf{Theme}: dark or light, your choice (Windows does not decide for you).
 \end{itemize}
 
-\subsection{Administrator helper}\label{sec:assistant}
-Bringing a device back, forcing an ejection and searching among Windows programs require
-administrator rights. Without the helper, Windows asks for confirmation (UAC prompt) every
-time. \menu{Install the helper} creates a scheduled task “Pipit\textbackslash Assistant”
-(a single confirmation): after that, nothing is asked again. It only runs for the time of a
-requested action, does only these three things, and can be removed in one click.
+\subsection{Administrator rights}\label{sec:assistant}
+Bringing a device back, forcing an ejection and “Search everywhere” require administrator
+rights: Windows shows its confirmation prompt (UAC) every time. This is deliberate. Pipit
+installs no service or permanent task that would keep these rights, so no other program can
+use them behind your back. The administrator part only receives the action and the device
+identifier; it checks by itself that it really is an external device (or an ejected device
+still plugged in, for bringing it back) and refuses everything else.
+
+\attention{Version 0.2.0 installed a scheduled task “Pipit\textbackslash Assistant” that
+turned out to be risky. If it is still there, the settings offer to remove it.}
 
 \section{Updates and incident reports}
 

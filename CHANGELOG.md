@@ -1,5 +1,33 @@
 # Journal des versions — Pipit
 
+### 0.3.0
+
+Sécurité (audit complet) :
+- 🔴 Plus de tâche planifiée « Pipit\Assistant » : elle lançait avec les droits d'administrateur des
+  fichiers modifiables par n'importe quel programme de la session (contournement de l'UAC). Chaque geste
+  administrateur passe désormais par la fenêtre UAC ; l'ancienne tâche est détectée et retirée.
+- Échange avec le processus élevé par un canal nommé aléatoire, authentifié par une clé à usage unique
+  (plus aucun fichier écrit ou effacé avec les droits d'administrateur dans le profil).
+- Le processus élevé recalcule lui-même le périphérique et ses lettres (ignore ce qu'on lui envoie),
+  refuse les disques internes et le disque système ; « remonter » n'agit que sur un périphérique éjecté
+  encore branché (problème 47), jamais sur un périphérique désactivé exprès.
+- Plus aucune fermeture de fichiers dans un autre programme (action supprimée).
+
+Gels, plantages, performance :
+- Liste des périphériques lue en arrière-plan, relue au branchement (WM_DEVICECHANGE) ; sondage de
+  secours toutes les 10 s au lieu de 2,5 s ; aucune lecture pendant une éjection.
+- Icône redessinée seulement quand le nombre change ; double clic = un seul menu.
+- Éjection forcée : volumes gardés verrouillés jusqu'à l'éjection.
+- Recherche des fichiers ouverts : un seul inventaire, une seule recherche à la fois.
+- Journal de Windows : seuls les événements de CE périphérique, plus de numéro de programme deviné.
+- Fin de session : éjection rapide, sans recherche de coupables.
+- Boîte « insérez un disque » coupée pour le seul fil de lecture ; clé « Run » créée si absente.
+
+Nouveautés :
+- Lecteurs CD/DVD (internes compris) : un clic ouvre le tiroir ; « Fermer le tiroir ».
+- Images ISO et disques VHD montés : un clic les démonte.
+- « Montrer » : met au premier plan le programme qui bloque.
+
 ### 0.2.0
 
 - Éjection forcée : caches vidés, volume démonté même avec des fichiers ouverts, puis éjection

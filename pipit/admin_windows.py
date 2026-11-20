@@ -39,30 +39,41 @@ cfgmgr32.CM_Enable_DevNode.argtypes = [wintypes.DWORD, wintypes.ULONG]
 
 
 # ------------------------------------------------------------------ éjection forcée
-def _demonter(lettre: str) -> str:
+def _demonter(lettre: str):
+    """(poignée verrouillée ou None, étape). La poignée reste ouverte jusqu'à l'éjection :
+    sinon l'Explorateur, l'antivirus ou un sondage remonte le volume entre-temps."""
     h = kernel32.CreateFileW(f"\\\\.\\{lettre}:", GENERIC_RW, dw.FILE_SHARE_RW, None, dw.OPEN_EXISTING, 0, None)
     if h in (None, dw.INVALID_HANDLE):
-        return "ouverture"
-    try:
-        kernel32.FlushFileBuffers(h)            # ce qui est en mémoire part sur le disque d'abord
-        verrou = False
-        for _ in range(3):
-            if dw._ioctl(h, FSCTL_LOCK_VOLUME, taille_sortie=0) is not None:
-                verrou = True
-                break
-            time.sleep(0.4)
-        dw._ioctl(h, FSCTL_DISMOUNT_VOLUME, taille_sortie=0)
-        if verrou:
-            dw._ioctl(h, IOCTL_STORAGE_MEDIA_REMOVAL, b"\0", 0)
-        return "verrouille" if verrou else "demonte_de_force"
-    finally:
-        kernel32.CloseHandle(h)
+        return None, "ouverture"
+    kernel32.FlushFileBuffers(h)                # ce qui est en mémoire part sur le disque d'abord
+    verrou = False
+    for _ in range(3):
+        if dw._ioctl(h, FSCTL_LOCK_VOLUME, taille_sortie=0) is not None:
+            verrou = True
+            break
+        time.sleep(0.4)
+    dw._ioctl(h, FSCTL_DISMOUNT_VOLUME, taille_sortie=0)
+    if verrou:
+        dw._ioctl(h, IOCTL_STORAGE_MEDIA_REMOVAL, b"\0", 0)
+    return h, ("verrouille" if verrou else "demonte_de_force")
 
 
 def forcer(id_ejectable: str, lettres: list[str]) -> dict:
-    etapes = {l: _demonter(l) for l in lettres}
+    poignees, etapes = [], {}
+    for l in lettres:
+        h, etape = _demonter(l)
+        etapes[l] = etape
+        if h is not None:
+            poignees.append(h)
     veto, nom = 0, ""
-    for _ in range(3):
+    try:
+        veto, nom = dw.ejecter(id_ejectable)            # premier essai, volumes encore verrouillés
+        if veto in (0, 13):
+            return {"ok": True, "etapes": etapes}
+    finally:
+        for h in poignees:
+            kernel32.CloseHandle(h)
+    for _ in range(3):                                  # nos propres poignées peuvent gêner : sans elles
         veto, nom = dw.ejecter(id_ejectable)
         if veto in (0, 13):
             return {"ok": True, "etapes": etapes}

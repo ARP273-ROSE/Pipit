@@ -104,8 +104,8 @@ kernel32.GetVolumeInformationW.argtypes = [wintypes.LPCWSTR, wintypes.LPWSTR, wi
                                            ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p,
                                            wintypes.LPWSTR, wintypes.DWORD]
 kernel32.GetSystemWindowsDirectoryW.argtypes = [wintypes.LPWSTR, wintypes.UINT]
-kernel32.SetErrorMode.argtypes = [wintypes.UINT]
-kernel32.SetErrorMode.restype = wintypes.UINT
+kernel32.SetThreadErrorMode.argtypes = [wintypes.DWORD, ctypes.POINTER(wintypes.DWORD)]
+kernel32.SetThreadErrorMode.restype = wintypes.BOOL
 
 cfgmgr32.CM_Get_Parent.argtypes = [ctypes.POINTER(wintypes.DWORD), wintypes.DWORD, wintypes.ULONG]
 cfgmgr32.CM_Get_Device_IDW.argtypes = [wintypes.DWORD, wintypes.LPWSTR, wintypes.ULONG, wintypes.ULONG]
@@ -264,7 +264,8 @@ def _disques_physiques(guid=GUID_DEVINTERFACE_DISK):
 
 def _lettres_par_disque() -> dict[tuple[int, int], list[tuple[str, str]]]:
     """{(type, numéro de disque): [(lettre, nom du volume)]} ; type 7 = disque, 2 = CD/DVD."""
-    ancien = kernel32.SetErrorMode(0x1 | 0x8000)     # pas de boîte « insérez un disque »
+    ancien = wintypes.DWORD(0)
+    kernel32.SetThreadErrorMode(0x1 | 0x10, ctypes.byref(ancien))   # pas de boîte « insérez un disque » (ce fil seul)
     resultat: dict[int, list[tuple[str, str]]] = {}
     try:
         masque = kernel32.GetLogicalDrives()
@@ -288,7 +289,7 @@ def _lettres_par_disque() -> dict[tuple[int, int], list[tuple[str, str]]]:
                 nom.value = ""
             resultat.setdefault((num[0], num[1]), []).append((lettre, nom.value))
     finally:
-        kernel32.SetErrorMode(ancien)
+        kernel32.SetThreadErrorMode(ancien.value, None)
     return resultat
 
 

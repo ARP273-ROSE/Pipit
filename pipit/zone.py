@@ -19,20 +19,28 @@ ICONES = Path(__file__).resolve().parent / "icones"
 
 
 class _FiltreNatif(QtCore.QAbstractNativeEventFilter):
-    def __init__(self, raccourcis):
+    """WM_HOTKEY (raccourcis) et WM_DEVICECHANGE (branchement, débranchement : on relit la
+    liste tout de suite au lieu d'attendre le prochain sondage)."""
+
+    def __init__(self, raccourcis, changement=None):
         super().__init__()
         self.raccourcis = raccourcis
+        self.changement = changement
 
     def nativeEventFilter(self, type_evt, message):
-        if type_evt == b"windows_generic_MSG" and self.raccourcis is not None:
+        if type_evt == b"windows_generic_MSG":
             from ctypes import wintypes
             msg = wintypes.MSG.from_address(int(message))
-            if msg.message == 0x0312 and self.raccourcis.message(msg.message, msg.wParam):
+            if msg.message == 0x0312 and self.raccourcis is not None \
+                    and self.raccourcis.message(msg.message, msg.wParam):
                 return True, 0
+            if msg.message == 0x0219 and self.changement is not None:     # WM_DEVICECHANGE
+                self.changement()
         return False, 0
 
 
 class Zone(QtCore.QObject):
+    liste_prete = QtCore.pyqtSignal(object, object)   # (périphériques, éjectés encore branchés)
     fini = QtCore.pyqtSignal(object, object)          # (périphérique, Resultat)
     fini_admin = QtCore.pyqtSignal(str, object, object)   # (action, périphérique ou (id, nom), réponse)
 
@@ -57,6 +65,13 @@ class Zone(QtCore.QObject):
         self.tray.activated.connect(self._clic)
         self.fini.connect(self._resultat)
         self.fini_admin.connect(self._resultat_admin)
+        self.liste_prete.connect(self._liste_recue)
+        self._lecture = threading.Lock()              # une seule lecture des périphériques à la fois
+        self._etat_icone = None
+        self._relire = QtCore.QTimer(self)            # WM_DEVICECHANGE arrive en rafale : on regroupe
+        self._relire.setSingleShot(True)
+        self._relire.setInterval(400)
+        self._relire.timeout.connect(self.actualiser)
         # fenêtre invisible : reçoit WM_HOTKEY et donne le premier plan au menu
         self.ancre = QtWidgets.QWidget()
         self.ancre.setWindowFlags(QtCore.Qt.WindowType.Tool | QtCore.Qt.WindowType.FramelessWindowHint)
@@ -64,11 +79,12 @@ class Zone(QtCore.QObject):
         self.raccourcis = None
         self.filtre = None
         self.appliquer_raccourcis()
-        self.minuteur = QtCore.QTimer(self)
+        self.minuteur = QtCore.QTimer(self)              # filet de sécurité ; l'essentiel = WM_DEVICECHANGE
         self.minuteur.timeout.connect(self.actualiser)
-        self.minuteur.start(2500)
-        self.actualiser()
+        self.minuteur.start(10000)
+        self._afficher_icone()
         self.tray.show()
+        self.actualiser()
 
     # ------------------------------------------------------------ apparence
     def appliquer_theme(self) -> None:
@@ -116,6 +132,7 @@ class Zone(QtCore.QObject):
 
     # ------------------------------------------------------------ liste
     def lister(self, avec_masques: bool = False) -> list[Peripherique]:
+        """Lecture directe (fenêtre des réglages, tests). L'icône, elle, lit en arrière-plan."""
         try:
             return peripheriques.lister(set(self.reglages.masques), self.reglages.internes_a_chaud,
                                         avec_masques=avec_masques, appareils=self.reglages.appareils,
@@ -123,9 +140,46 @@ class Zone(QtCore.QObject):
         except Exception:                                # noqa: BLE001 — l'icône ne doit pas mourir
             return []
 
-    def actualiser(self) -> None:
-        self._derniers = self.lister()
+    def actualiser(self, attendre: bool = False) -> None:
+        """Relit les périphériques dans un fil : un disque qui ne répond plus ne fige jamais
+        l'icône. Pas de lecture pendant une éjection (Pipit ouvrirait le volume qu'il retire)."""
+        if self.en_cours and not attendre:
+            return
+        pris = self._lecture.acquire(timeout=15) if attendre else self._lecture.acquire(blocking=False)
+        if not pris:
+            return
+
+        def travail():
+            try:
+                perifs = self.lister()
+                attente = peripheriques.en_attente_de_retrait()
+            except Exception:                            # noqa: BLE001
+                perifs, attente = [], []
+            finally:
+                self._lecture.release()
+            self.liste_prete.emit(perifs, attente)
+
+        fil = threading.Thread(target=travail, daemon=True, name="pipit-lecture")
+        fil.start()
+        if attendre:
+            fil.join(15)
+            QtWidgets.QApplication.processEvents()
+
+    def demander_relecture(self) -> None:
+        self._relire.start()
+
+    def _liste_recue(self, perifs, attente) -> None:
+        self._derniers, self._attente = perifs, attente
+        self._afficher_icone()
+        if self.fenetre is not None and self.fenetre.isVisible():
+            self.fenetre.rafraichir_si_change()
+
+    def _afficher_icone(self) -> None:
         n = len(self._derniers)
+        etat = (n, self.reglages.compteur)
+        if etat == self._etat_icone:                     # rien n'a changé : pas de redessin
+            return
+        self._etat_icone = etat
         self.tray.setIcon(self._icone_zone(n))
         self.tray.setToolTip(tr("zone.infobulle.aucun") if n == 0 else
                              tr("zone.infobulle.un") if n == 1 else tr("zone.infobulle.plusieurs", n=n))
@@ -148,8 +202,8 @@ class Zone(QtCore.QObject):
     # ------------------------------------------------------------ menus
     def construire_menu(self, menu: QtWidgets.QMenu, complet: bool) -> None:
         menu.clear()
-        self.actualiser()
-        self._attente = peripheriques.en_attente_de_retrait()     # seulement à l'ouverture du menu
+        # liste déjà lue en arrière-plan ; on en relance une pour la prochaine ouverture
+        self.demander_relecture()
         titre = menu.addAction(tr("zone.titre"))
         titre.setEnabled(False)
         if not self._derniers:
@@ -202,8 +256,7 @@ class Zone(QtCore.QObject):
             menu.addAction(tr("zone.plus"), lambda: self.montrer_menu(complet=True))
 
     def _clic(self, raison) -> None:
-        if raison in (QtWidgets.QSystemTrayIcon.ActivationReason.Trigger,
-                      QtWidgets.QSystemTrayIcon.ActivationReason.DoubleClick):
+        if raison == QtWidgets.QSystemTrayIcon.ActivationReason.Trigger:   # un double clic = un seul menu
             self.montrer_menu()
 
     def montrer_menu(self, complet: bool = False) -> None:
@@ -228,7 +281,7 @@ class Zone(QtCore.QObject):
         hwnd = int(self.ancre.winId())
         self.raccourcis = Raccourcis(hwnd)
         if self.filtre is None:
-            self.filtre = _FiltreNatif(self.raccourcis)
+            self.filtre = _FiltreNatif(self.raccourcis, self.demander_relecture)
             self.app.installNativeEventFilter(self.filtre)
         self.filtre.raccourcis = self.raccourcis
         for texte, action in ((self.reglages.raccourci_menu, self.montrer_menu),
@@ -285,6 +338,8 @@ class Zone(QtCore.QObject):
         self.en_cours.discard(p.id)
         self.actualiser()
         if r.ok:
+            if r.veto == peripheriques.VETO_DEJA_RETIRE:   # débranché pendant que le menu était ouvert
+                return
             if p.geste == "ejecter":
                 self._notifier_ok(self.nom(p))
             elif self.reglages.notifier and p.geste == "demonter":
@@ -466,8 +521,9 @@ class Zone(QtCore.QObject):
         boite.exec()
         gestionnaire.release()
         if boite.clickedButton() is tout:
-            for p in restants:
-                peripheriques.ejecter(p, essais=1)
+            for p in restants:                     # vite : pas de recherche de coupables à l'arrêt
+                if p.geste == "ejecter":
+                    peripheriques.ejecter(p, essais=1, chercher=False)
 
     # ------------------------------------------------------------ fenêtres
     def ouvrir_reglages(self) -> None:

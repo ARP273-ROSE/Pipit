@@ -90,7 +90,7 @@ def memoriser(p: Peripherique) -> None:
         pass
 
 
-def ejecter(p: Peripherique, essais: int = 2) -> Resultat:
+def ejecter(p: Peripherique, essais: int = 2, chercher: bool = True) -> Resultat:
     """Éjecte ; en cas de refus, refait un essai (un antivirus qui scanne la clé la lâche
     souvent dans la seconde) puis cherche qui retient le périphérique. Un lecteur CD/DVD
     ouvre son tiroir ; une image ISO/VHD est démontée."""
@@ -111,8 +111,11 @@ def ejecter(p: Peripherique, essais: int = 2) -> Resultat:
             return Resultat(True, veto)
         if i + 1 < essais:
             time.sleep(1.0)
+    if not chercher:
+        return Resultat(False, veto, nom)
     from . import bloqueurs, poignees
-    trouves = bloqueurs.chercher(depuis=debut - 2, lettres=p.lettres)
+    trouves = bloqueurs.chercher(depuis=debut - 2, lettres=p.lettres,
+                                 ids=[p.id] + [d.id_disque for d in p.disques])
     # le journal de Windows ne note pas tout : on regarde aussi les fichiers ouverts
     # par les programmes de l'utilisateur (sans droits d'administrateur)
     connus = {b.pid for b in trouves}
@@ -144,7 +147,7 @@ def remonter(ident: str) -> dict:
 
 def forcer(p: Peripherique) -> dict:
     from . import assistant
-    r = assistant.demander("forcer", p.id, p.lettres)
+    r = assistant.demander("forcer", p.id)
     if r.get("ok"):
         memoriser(p)
     return r
@@ -157,7 +160,7 @@ def coupables(p: Peripherique, partout: bool = False) -> list | None:
     if not partout:
         return poignees.chercher(p.lettres)
     from . import assistant
-    r = assistant.demander("coupables", p.id, p.lettres)
+    r = assistant.demander("coupables", p.id)
     if not r.get("ok"):
         return None
     return [poignees.Coupable(**c) for c in r.get("coupables", [])]

@@ -192,8 +192,7 @@ def main() -> int:
     if "--assistant" in sys.argv[1:]:
         # assistant administrateur (tâche planifiée ou fenêtre UAC) : traite les demandes, puis s'arrête
         from pipit import assistant
-        suite = sys.argv[sys.argv.index("--assistant") + 1:]
-        return assistant.executer(suite[0] if suite else None)
+        return assistant.executer(sys.argv[sys.argv.index("--assistant") + 1:])
     from pipit.i18n import definir_langue, tr
     ap = argparse.ArgumentParser(description=tr("cli.description"))
     ap.add_argument("--discret", action="store_true", help="tray icon only / icône seule")
@@ -222,8 +221,9 @@ def main() -> int:
     from PyQt6 import QtCore
     if sys.platform == "win32":
         import ctypes
-        mutex = ctypes.windll.kernel32.CreateMutexW(None, False, f"{NOM}EnCours")
-        if ctypes.windll.kernel32.GetLastError() == 183:      # ERROR_ALREADY_EXISTS : déjà lancé
+        k32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        mutex = k32.CreateMutexW(None, False, f"{NOM}EnCours")
+        if ctypes.get_last_error() == 183:                       # ERROR_ALREADY_EXISTS : déjà lancé
             return 0
     else:
         mutex = None
