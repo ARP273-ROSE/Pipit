@@ -1,5 +1,25 @@
 # Journal des versions — Pipit
 
+### 0.4.0
+
+Réglages par appareil (bouton « Réglages… » de chaque ligne) :
+- Lettre fixe : Windows retient la lettre choisie pour ce volume (une fenêtre UAC, une fois). Si
+  l'appareil arrive quand même sous une autre lettre, une bulle propose de la remettre d'un clic.
+- Programme lancé au branchement, avec les droits de l'utilisateur ; un .exe reçoit la racine du lecteur.
+- Raccourci clavier qui éjecte cet appareil (Ctrl+Alt+1…9, Win+Alt+1…9).
+- Couper le courant du port après l'éjection (DisableOnSoftRemove pour ce seul matériel, UAC).
+
+Vitesse USB :
+- Colonne « Vitesse USB » et infobulle du menu : USB 2.0 — 480 Mbit/s, USB 3 — 5 ou 10 Gbit/s.
+- Bulle quand un périphérique USB 3 tourne sur un port ou un câble USB 2 (option).
+
+Remontage :
+- Nouvelle méthode : redémarrage du port USB (IOCTL_USB_HUB_CYCLE_PORT), essayée juste après la
+  première ; c'est celle qui marche sous Windows 8 à 11 d'après les outils connus.
+
+Sécurité : le processus élevé reçoit une valeur au format strict (deux lettres D–Z, ou 0/1) et ne
+change que la lettre d'un volume du périphérique désigné, vers une lettre libre.
+
 ### 0.3.0
 
 Sécurité (audit complet) :

@@ -187,10 +187,14 @@ def test_assistant_refuse_les_demandes_douteuses():
 def test_assistant_arguments_stricts():
     from pipit import assistant
     assert assistant.executer([]) == 2
-    assert assistant.executer(["forcer", "USB\\VID_1&PID_2\\3", "\\\\.\\pipe\\autre", "00" * 32, "1"]) == 2
-    assert assistant.executer(["forcer", "USB\\VID_1&PID_2\\3", "\\\\.\\pipe\\pipit-" + "a" * 32, "zz", "1"]) == 2
-    assert assistant.executer(["forcer", "USB\\VID_1&PID_2\\3", "\\\\.\\pipe\\pipit-" + "a" * 32, "00" * 32,
+    assert assistant.executer(["forcer", "USB\\VID_1&PID_2\\3", "-", "\\\\.\\pipe\\autre", "00" * 32, "1"]) == 2
+    assert assistant.executer(["forcer", "USB\\VID_1&PID_2\\3", "-", "\\\\.\\pipe\\pipit-" + "a" * 32, "zz",
+                               "1"]) == 2
+    assert assistant.executer(["forcer", "USB\\VID_1&PID_2\\3", "-", "\\\\.\\pipe\\pipit-" + "a" * 32, "00" * 32,
                                "pas_un_pid"]) == 2
+    # ancien format (5 arguments) refusé
+    assert assistant.executer(["forcer", "USB\\VID_1&PID_2\\3", "\\\\.\\pipe\\pipit-" + "a" * 32, "00" * 32,
+                               "1"]) == 2
 
 
 def test_remonter_seulement_un_peripherique_ejecte():
@@ -234,3 +238,47 @@ def test_dvd_masquables_par_option():
 
 def test_montrer_programme():
     assert bloqueurs.montrer(4242)
+
+
+# ------------------------------------------------------------ 0.4.0
+def test_valeurs_de_l_assistant_strictes():
+    from pipit import assistant
+    ident = "USB\\VID_1&PID_2\\3"
+    assert not assistant.demander("lettre", ident, "E")["ok"]             # une seule lettre
+    assert not assistant.demander("lettre", ident, "EC")["ok"]            # C: interdite
+    assert not assistant.demander("lettre", ident, "E:\\")["ok"]
+    assert not assistant.demander("courant", ident, "oui")["ok"]
+    assert not assistant.demander("forcer", ident, "EK")["ok"]            # valeur inattendue
+    assert assistant.traiter("lettre", ident, "C D")["detail"] == "demande invalide"
+
+
+def test_lettre_fixe_demo():
+    from pipit import demo
+    p = [p for p in peripheriques.lister() if "VID_0951" in p.id][0]
+    assert "K" in peripheriques.lettres_libres() and "G" not in peripheriques.lettres_libres()
+    assert peripheriques.changer_lettre(p, "G", "K")["ok"]
+    assert [q.lettres for q in peripheriques.lister() if "VID_0951" in q.id] == [["K"]]
+    assert not peripheriques.changer_lettre(p, "Z", "L")["ok"]           # lettre qui n'est pas à lui
+    demo.remettre()
+
+
+def test_courant_demo():
+    from pipit import demo
+    p = peripheriques.lister()[0]
+    assert peripheriques.regler_courant(p, True)["ok"] and demo._courant[p.id] is True
+
+
+def test_vitesse_usb():
+    from pipit import usb
+    perifs = {p.nom: p for p in peripheriques.lister()}
+    assert perifs["Kingston DataTraveler 3.0"].vitesse == (2, 3)
+    assert usb.bride(2, 3) and not usb.bride(3, 3) and not usb.bride(-1, -1)
+    assert usb.lisible(4) == "USB 3 — 10 Gbit/s" and usb.lisible(-1) == ""
+    assert usb.cle_usbflags("USB\\VID_0781&PID_558C&REV_1000") == "0781558C1000"
+    assert usb.cle_usbflags("USB\\VID_0781&PID_558C") == ""            # sans révision : rien
+    assert usb.vitesse("SCSI\\DISK") == (-1, -1)
+
+
+def test_programme_au_branchement(tmp_path):
+    assert not peripheriques.lancer_programme(str(tmp_path / "absent.exe"), "E")
+    assert not peripheriques.lancer_programme("", "E")

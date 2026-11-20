@@ -17,24 +17,28 @@ _DISQUES = [
     Disque(1, "ST4000DM004-2CV104", "SATA", 4_000_787_030_016, ["D"], ["Données"],
            "SCSI\\DISK&VEN_ST4000\\2", "PCIIDE\\IDECHANNEL\\4&1&0", "PCI\\VEN_1022&DEV_43EB\\3", False),
     Disque(2, "SanDisk Extreme Pro USB Device", "USB", 1_000_204_886_016, ["E"], ["SAUVEGARDE"],
-           "USBSTOR\\DISK&VEN_SANDISK\\4", "USB\\VID_0781&PID_558C\\AA01", "USB\\ROOT_HUB30\\5", True),
+           "USBSTOR\\DISK&VEN_SANDISK\\4", "USB\\VID_0781&PID_558C\\AA01", "USB\\ROOT_HUB30\\5", True,
+           vitesse=3, vitesse_max=3),
     Disque(3, "Generic STORAGE DEVICE (SD)", "USB", 63_864_569_856, ["F"], ["NIKON Z"],
-           "USBSTOR\\DISK&VEN_GENERIC&PROD_SD\\6", "USB\\VID_05E3&PID_0749\\0000", "USB\\ROOT_HUB30\\5", True),
+           "USBSTOR\\DISK&VEN_GENERIC&PROD_SD\\6", "USB\\VID_05E3&PID_0749\\0000", "USB\\ROOT_HUB30\\5", True,
+           vitesse=3, vitesse_max=3),
     Disque(4, "Generic STORAGE DEVICE (CF)", "USB", 0, [], [],
            "USBSTOR\\DISK&VEN_GENERIC&PROD_CF\\7", "USB\\VID_05E3&PID_0749\\0000", "USB\\ROOT_HUB30\\5", True),
     Disque(5, "Kingston DataTraveler 3.0", "USB", 31_037_849_600, ["G"], ["CLE"],
-           "USBSTOR\\DISK&VEN_KINGSTON\\8", "USB\\VID_0951&PID_1666\\BB02", "USB\\ROOT_HUB30\\5", True),
+           "USBSTOR\\DISK&VEN_KINGSTON\\8", "USB\\VID_0951&PID_1666\\BB02", "USB\\ROOT_HUB30\\5", True,
+           vitesse=2, vitesse_max=3),     # clé USB 3 sur un port USB 2 : Pipit le signale
     Disque(6, "Samsung Portable SSD T7", "USB", 1_000_204_886_016, ["H"], ["MONTAGE"],
            "SCSI\\DISK&VEN_SAMSUNG&PROD_PORTABLE_SSD_T7\\9", "USB\\VID_04E8&PID_4001\\CC03",
-           "USB\\ROOT_HUB30\\5", False, ssd=True),
+           "USB\\ROOT_HUB30\\5", False, ssd=True, vitesse=4, vitesse_max=4),
     Disque(-1, "Apple iPad", "USB", 0, [], [], "SWD\\WPDBUSENUM\\IPAD", "USB\\VID_05AC&PID_12AB\\DD04",
-           "USB\\ROOT_HUB30\\5", appareil="telephone"),
+           "USB\\ROOT_HUB30\\5", appareil="telephone", vitesse=2, vitesse_max=2),
     Disque(1000, "HL-DT-ST DVDRAM GH24NSD1", "SATA", 0, ["T"], [""], "SCSI\\CDROM&VEN_HL-DT-ST\\10",
            appareil="optique"),
     Disque(1001, "Microsoft Virtual DVD-ROM", "Fichier", 4_700_000_000, ["V"], ["WIN11_FR"],
            "SCSI\\CDROM&VEN_MSFT&PROD_VIRTUAL_DVD-ROM\\11", appareil="optique"),
 ]
 _tiroirs: dict[str, bool] = {}
+_LETTRES_DEPART = [list(d.lettres) for d in _DISQUES]
 
 
 def lister() -> list[Disque]:
@@ -73,13 +77,19 @@ def remettre() -> None:
     _retires.clear()
     _tiroirs.clear()
     _en_attente.clear()
+    _courant.clear()
+    for d, lettres in zip(_DISQUES, _LETTRES_DEPART):
+        d.lettres = list(lettres)
 
 
 def en_attente_de_retrait() -> list[tuple[str, str]]:
     return list(_en_attente.items())
 
 
-def assistant(action: str, ident: str) -> dict:
+_courant: dict[str, bool] = {}
+
+
+def assistant(action: str, ident: str, valeur: str = "-") -> dict:
     lettres = [l for d in _DISQUES if d.id_ejectable == ident for l in d.lettres]
     if action == "remonter":
         if ident not in _en_attente:
@@ -87,6 +97,15 @@ def assistant(action: str, ident: str) -> dict:
         _retires.discard(ident)
         _en_attente.pop(ident, None)
         return {"ok": True, "methode": "demo"}
+    if action == "lettre":
+        for d in _DISQUES:
+            if d.id_ejectable == ident and valeur[0] in d.lettres:
+                d.lettres = [valeur[1] if l == valeur[0] else l for l in d.lettres]
+                return {"ok": True, "lettre": valeur[1]}
+        return {"ok": False, "detail": "lettre"}
+    if action == "courant":
+        _courant[ident] = valeur == "1"
+        return {"ok": True}
     if action == "forcer":
         _retires.add(ident)
         _en_attente[ident] = "?"

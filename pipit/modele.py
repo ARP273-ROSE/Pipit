@@ -20,6 +20,8 @@ class Disque:
     systeme: bool = False
     ssd: bool | None = None          # pas de pénalité de recherche ; None = le boîtier ne dit rien
     appareil: str = ""               # "" = disque ; sinon telephone, tablette, photo, optique (pas de stockage)
+    vitesse: int = -1                # USB : 0 (1,5 Mbit/s) … 4 (10 Gbit/s) ; -1 = inconnue
+    vitesse_max: int = -1            # ce que le périphérique saurait faire sur un meilleur port
 
 
 TYPES = ("cle", "carte", "ssd", "hdd", "interne", "optique", "virtuel", "telephone", "tablette", "photo", "autre")
@@ -111,6 +113,12 @@ class Peripherique:
         if self.type == "optique":
             return "tiroir"
         return "ejecter"
+
+    @property
+    def vitesse(self) -> tuple[int, int]:
+        """(vitesse actuelle, meilleure possible), voir usb.py."""
+        d = self.disques[0] if self.disques else None
+        return (d.vitesse, d.vitesse_max) if d else (-1, -1)
 
     @property
     def lecteur_de_cartes(self) -> bool:

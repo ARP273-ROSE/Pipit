@@ -206,6 +206,33 @@ the icon stays next to the clock. To really quit: \menu{Quit Pipit} in the menu.
   them even while the device is unplugged.
 \end{itemize}
 
+\begin{itemize}
+\item \textbf{USB speed}: the real speed of the port (USB~2.0 — 480~Mbit/s, USB~3 — 5 or
+  10~Gbit/s). If a USB~3 device runs at USB~2 speed (black port, extension, old cable),
+  Pipit says so and shows a balloon when it arrives: plug it into a blue port.
+\end{itemize}
+
+\subsection{Settings of one device}
+The \menu{Settings…} button at the end of each row opens the settings of that hardware;
+Pipit remembers them while it is unplugged.
+
+\capture{../capture_appareil-en.png}
+\begin{itemize}
+\item \textbf{Fixed letter}: for instance always \texttt{K:} for the backup drive. Windows
+  remembers the letter for this volume, like Disk Management: one Windows confirmation is
+  enough. If the letter is taken when you plug it in, the device gets another one; Pipit
+  then offers, in a balloon, to put the right one back with one click.
+\item \textbf{When plugged in, run}: a program or script opened every time the device
+  arrives (backup or photo software…). An \texttt{.exe} receives the drive root
+  (\texttt{K:\textbackslash}). It runs with your usual rights, never as administrator.
+\item \textbf{Shortcut that ejects it}: \touche{Ctrl}+\touche{Alt}+\touche{1} to
+  \touche{9} or \touche{Win}+\touche{Alt}+\touche{1} to \touche{9}.
+\item \textbf{Power off the port after ejection}: the light goes off, as in Windows~XP.
+  It is a Windows registry setting for this hardware only (one Windows confirmation),
+  effective the next time it is plugged in. Microsoft documented it for USB~2 ports; some
+  USB~3 ports ignore it.
+\end{itemize}
+
 \subsection{Keyboard shortcuts}
 \begin{itemize}
 \item \textbf{Open the menu}: \touche{Win}+\touche{Alt} by default (the same as in
@@ -233,7 +260,8 @@ pick another one.
 \end{itemize}
 
 \subsection{Administrator rights}\label{sec:assistant}
-Bringing a device back, forcing an ejection and “Search everywhere” require administrator
+Bringing a device back, forcing an ejection, “Search everywhere”, the fixed letter and powering off
+the port require administrator
 rights: Windows shows its confirmation prompt (UAC) every time. This is deliberate. Pipit
 installs no service or permanent task that would keep these rights, so no other program can
 use them behind your back. The administrator part only receives the action and the device

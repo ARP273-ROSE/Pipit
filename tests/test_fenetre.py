@@ -167,3 +167,52 @@ def test_tout_ejecter_ne_touche_ni_tiroir_ni_iso(app, zone):
     assert attendre(app, lambda: not zone.en_cours)
     restants = {p.type for p in zone.lister()}
     assert restants == {"optique", "virtuel"} and not demo._tiroirs
+
+
+def test_reglages_par_appareil(app, zone, tmp_path):
+    from pipit import demo
+    from pipit.fenetre import COL_OPTIONS, COL_VITESSE, DialogueAppareil
+    zone.ouvrir_reglages()
+    f = zone.fenetre
+    ligne = [i for i in range(f.table.rowCount()) if "VID_0951" in f.table.item(i, 0).toolTip()][0]
+    assert "USB 2.0" in f.table.item(ligne, COL_VITESSE).text() and "⚠" in f.table.item(ligne, COL_VITESSE).text()
+    assert f.table.cellWidget(ligne, COL_OPTIONS) is not None
+    p = [p for p in zone._tous if "VID_0951" in p.id][0]
+    programme = tmp_path / "outil.exe"
+    programme.write_text("")
+    dlg = DialogueAppareil(f, p)
+    dlg.cb_lettre.setCurrentIndex(dlg.cb_lettre.findData("K"))
+    dlg.e_programme.setText(str(programme))
+    dlg.cb_raccourci.setCurrentIndex(dlg.cb_raccourci.findData("Ctrl+Alt+3"))
+    dlg.c_courant.setChecked(True)
+    dlg.appliquer()
+    assert attendre(app, lambda: not zone.en_cours)
+    r = reglages.charger()
+    assert r.lettres_fixes[p.materiel] == "K" and r.au_branchement[p.materiel] == str(programme)
+    assert r.raccourcis_appareils[p.materiel] == "Ctrl+Alt+3"
+    assert r.courant_coupe == [p.materiel] and demo._courant[p.id] is True
+    zone.actualiser(attendre=True)
+    assert attendre(app, lambda: any(q.lettres == ["K"] for q in zone._tous if "VID_0951" in q.id))
+    demo.remettre()
+
+
+def test_arrivee_lettre_differente_propose_de_la_remettre(app, zone):
+    from pipit import demo
+    p = [p for p in zone.lister() if "VID_0951" in p.id][0]
+    zone.reglages.lettres_fixes[p.materiel] = "K"
+    zone._ids_connus = {q.id for q in zone._tous if q.id != p.id}     # comme s'il venait d'arriver
+    zone._liste_recue(zone.lister(avec_masques=True), [])
+    assert zone._action_message is not None
+    zone._message_clique()
+    assert attendre(app, lambda: not zone.en_cours)
+    assert [q.lettres for q in zone.lister() if "VID_0951" in q.id] == [["K"]]
+    demo.remettre()
+
+
+def test_raccourci_par_appareil(app, zone):
+    zone.reglages.raccourcis_appareils["USB\\VID_0951&PID_1666"] = "Ctrl+Alt+7"
+    zone.appliquer_raccourcis()
+    zone.actualiser(attendre=True)
+    zone.ejecter_materiel("USB\\VID_0951&PID_1666")
+    assert attendre(app, lambda: not zone.en_cours)
+    assert not any("VID_0951" in q.id for q in zone.lister())

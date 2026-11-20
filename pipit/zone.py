@@ -10,7 +10,7 @@ from pathlib import Path
 
 from PyQt6 import QtCore, QtGui, QtWidgets
 
-from . import __version__, bloqueurs, peripheriques, reglages, systeme
+from . import __version__, bloqueurs, peripheriques, reglages, systeme, usb
 from .i18n import langue, tr
 from .modele import TYPES, Peripherique, taille_lisible
 
@@ -55,6 +55,8 @@ class Zone(QtCore.QObject):
         self._derniers: list[Peripherique] = []
         self._tous: list[Peripherique] = []        # masqués compris (fenêtre des réglages)
         self._attente: list[tuple[str, str]] = []
+        self._ids_connus: set[str] | None = None    # None : première lecture, rien n'« arrive »
+        self._action_message = None                 # ce que fait un clic sur la bulle affichée
         logo = RACINE / "logo_32.png"
         self.icone = QtGui.QIcon(str(logo)) if logo.exists() else app.style().standardIcon(
             QtWidgets.QStyle.StandardPixmap.SP_DriveHDIcon)
@@ -66,6 +68,7 @@ class Zone(QtCore.QObject):
         self.menu_complet.aboutToShow.connect(lambda: self.construire_menu(self.menu_complet, complet=True))
         self.tray.setContextMenu(self.menu_complet)
         self.tray.activated.connect(self._clic)
+        self.tray.messageClicked.connect(self._message_clique)
         self.fini.connect(self._resultat)
         self.fini_admin.connect(self._resultat_admin)
         self.liste_prete.connect(self._liste_recue)
@@ -177,6 +180,12 @@ class Zone(QtCore.QObject):
         masques = {m.upper() for m in self.reglages.masques}
         self._tous = tous
         self._derniers = [p for p in tous if p.materiel not in masques]
+        ids = {p.id for p in tous}
+        if self._ids_connus is not None:
+            for p in self._derniers:
+                if p.id not in self._ids_connus:
+                    self._arrivee(p)
+        self._ids_connus = ids
         self._attente = attente
         self._afficher_icone()
         if self.fenetre is not None and self.fenetre.isVisible():
@@ -191,6 +200,44 @@ class Zone(QtCore.QObject):
         self.tray.setIcon(self._icone_zone(n))
         self.tray.setToolTip(tr("zone.infobulle.aucun") if n == 0 else
                              tr("zone.infobulle.un") if n == 1 else tr("zone.infobulle.plusieurs", n=n))
+
+    # ------------------------------------------------------------ arrivée d'un périphérique
+    def _bulle(self, titre: str, texte: str, action=None, duree: int = 6000) -> None:
+        self._action_message = action
+        self.tray.showMessage(titre, texte, self.icone, duree)
+
+    def _message_clique(self) -> None:
+        action, self._action_message = self._action_message, None
+        if action is not None:
+            action()
+
+    def _arrivee(self, p: Peripherique) -> None:
+        """Programme à lancer, lettre fixe à vérifier, port trop lent à signaler."""
+        r = self.reglages
+        voulue = r.lettres_fixes.get(p.materiel)
+        commande = r.au_branchement.get(p.materiel)
+        if commande:
+            lettre = (voulue if voulue in p.lettres else (p.lettres[0] if p.lettres else ""))
+            if not peripheriques.lancer_programme(commande, lettre):
+                self._bulle(systeme.NOM, tr("programme.echec", nom=self.nom(p), chemin=commande))
+        if voulue and p.lettres and voulue not in p.lettres and voulue in peripheriques.lettres_libres():
+            actuelle = p.lettres[0]
+            self._bulle(tr("lettre.titre"), tr("lettre.differente", nom=self.nom(p), actuelle=actuelle,
+                                               voulue=voulue),
+                        lambda: self.changer_lettre(p, actuelle, voulue), 10000)
+            return
+        actuel, possible = p.vitesse
+        if r.avertir_port_lent and usb.bride(actuel, possible):
+            self._bulle(tr("lent.titre"), tr("lent.texte", nom=self.nom(p), actuel=usb.lisible(actuel),
+                                             possible=usb.lisible(possible)))
+
+    def vitesse_texte(self, p: Peripherique) -> str:
+        actuel, possible = p.vitesse
+        if actuel < 0:
+            return ""
+        if usb.bride(actuel, possible):
+            return tr("vitesse.bride", actuel=usb.lisible(actuel), possible=usb.lisible(possible))
+        return usb.lisible(actuel)
 
     def nom(self, p: Peripherique) -> str:
         return self.reglages.noms.get(p.materiel) or p.nom
@@ -218,7 +265,9 @@ class Zone(QtCore.QObject):
             menu.addAction(tr("zone.aucun")).setEnabled(False)
         for p in self._derniers:
             a = menu.addAction(self.icone_de(p), self.libelle(p))
-            a.setToolTip(f"{tr('type.' + self.type_de(p))} — {p.bus} — {p.id}")
+            vitesse = self.vitesse_texte(p)
+            a.setToolTip(f"{tr('type.' + self.type_de(p))} — {p.bus}" + (f" — {vitesse}" if vitesse else "")
+                         + f"\n{p.id}")
             a.setEnabled(p.id not in self.en_cours)
             a.triggered.connect(lambda _=False, p=p: self.ejecter(p))
         if len(self._derniers) > 1:
@@ -292,11 +341,20 @@ class Zone(QtCore.QObject):
             self.filtre = _FiltreNatif(self.raccourcis, self.demander_relecture)
             self.app.installNativeEventFilter(self.filtre)
         self.filtre.raccourcis = self.raccourcis
-        for texte, action in ((self.reglages.raccourci_menu, self.montrer_menu),
-                              (self.reglages.raccourci_tout, self.tout_ejecter)):
+        liste = [(self.reglages.raccourci_menu, self.montrer_menu),
+                 (self.reglages.raccourci_tout, self.tout_ejecter)]
+        for materiel, texte in sorted(self.reglages.raccourcis_appareils.items()):
+            liste.append((texte, lambda m=materiel: self.ejecter_materiel(m)))
+        for texte, action in liste:
             if texte and not self.raccourcis.ajouter(texte, action):
                 refuses.append(texte)
         return refuses
+
+    def ejecter_materiel(self, materiel: str) -> None:
+        """Raccourci propre à un appareil : l'éjecte s'il est branché, sinon rien."""
+        for p in self._derniers:
+            if p.materiel == materiel:
+                self.ejecter(p)
 
     # ------------------------------------------------------------ éjection
     def ejecter(self, p: Peripherique, demander: bool = True) -> None:
@@ -455,6 +513,12 @@ class Zone(QtCore.QObject):
     def remonter(self, ident: str, nom: str) -> None:
         self._admin("remonter", (ident, nom), lambda: peripheriques.remonter(ident))
 
+    def changer_lettre(self, p: Peripherique, ancienne: str, nouvelle: str) -> None:
+        self._admin("lettre", p, lambda: {"voulue": nouvelle, **peripheriques.changer_lettre(p, ancienne, nouvelle)})
+
+    def regler_courant(self, p: Peripherique, couper: bool) -> None:
+        self._admin("courant", p, lambda: {**peripheriques.regler_courant(p, couper), "couper": couper})
+
     def chercher_coupables(self, p: Peripherique, partout: bool = False) -> None:
         self._admin("coupables", p, lambda: {"liste": peripheriques.coupables(p, partout), "partout": partout})
 
@@ -476,6 +540,25 @@ class Zone(QtCore.QObject):
                 self._echec_admin(r, remontage=True)
         elif action == "coupables":
             self._montrer_coupables(cible, r.get("liste"), r.get("partout"))
+        elif action == "lettre":
+            if r.get("ok"):
+                self._bulle(tr("lettre.titre"), tr("lettre.ok", nom=self.nom(cible), lettre=r.get("lettre", "?")))
+            elif r.get("detail") == "uac_refuse":
+                self._echec_admin(r)
+            else:
+                QtWidgets.QMessageBox.warning(None, systeme.NOM, tr("lettre.echec", lettre=r.get("voulue", "?"),
+                                                                    detail=r.get("detail", "?")))
+        elif action == "courant":
+            if r.get("ok"):
+                coupes = set(self.reglages.courant_coupe)
+                (coupes.add if r.get("couper") else coupes.discard)(cible.materiel)
+                self.reglages.courant_coupe = sorted(coupes)
+                reglages.enregistrer(self.reglages)
+                self._bulle(systeme.NOM, tr("courant.ok", nom=self.nom(cible)))
+            elif r.get("detail") == "uac_refuse":
+                self._echec_admin(r)
+            else:
+                QtWidgets.QMessageBox.warning(None, systeme.NOM, tr("courant.echec", detail=r.get("detail", "?")))
 
     def _echec_admin(self, r: dict, remontage: bool = False) -> None:
         detail = r.get("detail", "")

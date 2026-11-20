@@ -175,7 +175,7 @@ def _canal_essai(pid_annonce):
                     recu.update(json.loads(conn.recv_bytes().decode("utf-8")))
         fil = threading.Thread(target=accepter, daemon=True)
         fil.start()
-        code = assistant.executer(["coupables", "USB\\VID_FFFF&PID_FFFF\\INEXISTANT", canal, cle.hex(),
+        code = assistant.executer(["coupables", "USB\\VID_FFFF&PID_FFFF\\INEXISTANT", "-", canal, cle.hex(),
                                    str(pid_annonce if pid_annonce else os.getpid())])
         fil.join(10)
     return code, recu
@@ -201,3 +201,18 @@ def test_disque_interne_jamais_force():
         if d.id_ejectable:
             continue
         assert assistant.traiter("forcer", d.id_disque or "USB\\VID_0000&PID_0000\\X")["ok"] is False
+
+
+def test_vitesse_usb_sans_plantage():
+    """Interroge les concentrateurs pour chaque périphérique USB présent : jamais d'exception."""
+    from pipit import disques_windows, usb
+    for d in disques_windows.lister():
+        if d.id_ejectable.upper().startswith("USB\\"):
+            assert -1 <= d.vitesse <= 4 and d.vitesse_max >= d.vitesse
+    assert usb.vitesse("USB\\VID_FFFF&PID_FFFF\\INEXISTANT") == (-1, -1)
+
+
+def test_lettre_jamais_hors_du_peripherique():
+    from pipit import assistant
+    assert assistant.traiter("lettre", "USB\\VID_FFFF&PID_FFFF\\INEXISTANT", "CK")["detail"] == "demande invalide"
+    assert assistant.traiter("lettre", "USB\\VID_FFFF&PID_FFFF\\INEXISTANT", "EK")["detail"] == "peripherique"

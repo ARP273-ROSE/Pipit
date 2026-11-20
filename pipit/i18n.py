@@ -314,10 +314,11 @@ TEXTES: dict[str, dict[str, str]] = {
                          "“{nom}” could not be unmounted. Close the files opened from this drive, then try again."),
     "opt.optiques": _t("Montrer les lecteurs CD/DVD et les images ISO/VHD", "Show CD/DVD drives and ISO/VHD images"),
     "refus.montrer": _t("Montrer {programme}", "Show {programme}"),
-    "assistant.uac": _t("Remonter, forcer l'éjection et « Chercher partout » demandent les droits "
-                        "d'administrateur : Windows affiche sa fenêtre de confirmation à chaque fois. C'est voulu : "
+    "assistant.uac": _t("Remonter, forcer l'éjection, « Chercher partout », la lettre fixe et la coupure du "
+                        "courant demandent les droits d'administrateur : Windows affiche sa fenêtre de confirmation à chaque fois. C'est voulu : "
                         "aucun programme ne peut s'en servir en cachette.",
-                        "Bringing back, forcing ejection and “Search everywhere” require administrator rights: "
+                        "Bringing back, forcing ejection, “Search everywhere”, the fixed letter and powering "
+                        "off the port require administrator rights: "
                         "Windows shows its confirmation prompt every time. This is deliberate: no program can use "
                         "them behind your back."),
     "assistant.ancienne": _t("La tâche « Pipit\\Assistant » de la version 0.2.0 est encore installée. Elle présente "
@@ -326,4 +327,61 @@ TEXTES: dict[str, dict[str, str]] = {
                              "risk: remove it (one Windows confirmation)."),
     "assistant.retirer_ancienne": _t("Retirer l'ancienne tâche", "Remove the old task"),
     "dlg.plus_tard": _t("Plus tard", "Later"),
+    # ---- 0.4.0 : réglages par appareil, vitesse USB
+    "col.vitesse": _t("Vitesse USB", "USB speed"),
+    "col.options": _t("Réglages", "Settings"),
+    "appareil.bouton": _t("Réglages…", "Settings…"),
+    "appareil.titre": _t("Réglages de « {nom} »", "Settings for “{nom}”"),
+    "appareil.lettre": _t("Lettre fixe", "Fixed letter"),
+    "appareil.lettre.aucune": _t("Celle que Windows choisit", "Whatever Windows picks"),
+    "appareil.lettre.aide": _t("Windows retient la lettre pour ce volume : elle revient à chaque branchement tant "
+                               "qu'elle est libre. Une confirmation de Windows (droits d'administrateur).",
+                               "Windows remembers the letter for this volume: it comes back every time you plug "
+                               "it in, as long as it is free. One Windows confirmation (administrator rights)."),
+    "appareil.programme": _t("Au branchement, lancer", "When plugged in, run"),
+    "appareil.programme.aide": _t("Un programme (.exe) reçoit la racine du lecteur, par exemple « E:\\ ». "
+                                  "Lancé avec vos droits habituels, jamais en administrateur.",
+                                  "A program (.exe) receives the drive root, for example “E:\\”. Run with your "
+                                  "usual rights, never as administrator."),
+    "appareil.parcourir": _t("Choisir…", "Browse…"),
+    "appareil.effacer": _t("Aucun", "None"),
+    "appareil.filtre": _t("Programmes et scripts", "Programs and scripts"),
+    "appareil.raccourci": _t("Raccourci qui l'éjecte", "Shortcut that ejects it"),
+    "appareil.courant": _t("Couper le courant du port après l'éjection", "Power off the port after ejection"),
+    "appareil.courant.aide": _t("Le voyant du périphérique s'éteint, comme sous Windows XP. Réglage du registre "
+                                "de Windows pour ce seul matériel (une confirmation de Windows) ; certains ports "
+                                "USB 3 l'ignorent. Prend effet au prochain branchement.",
+                                "The device light goes off, as in Windows XP. A Windows registry setting for this "
+                                "hardware only (one Windows confirmation); some USB 3 ports ignore it. Takes effect "
+                                "the next time it is plugged in."),
+    "appareil.vitesse": _t("Vitesse du port", "Port speed"),
+    "appareil.ok": _t("Enregistrer", "Save"),
+    "vitesse.inconnue": _t("inconnue", "unknown"),
+    "vitesse.bride": _t("{actuel} — saurait aller en {possible} : branchez-le sur un port USB 3 (bleu) ou "
+                        "changez de câble.",
+                        "{actuel} — could run at {possible}: plug it into a USB 3 port (blue) or change "
+                        "the cable."),
+    "lent.titre": _t("Port USB trop lent", "USB port too slow"),
+    "lent.texte": _t("« {nom} » fonctionne en {actuel} alors qu'il sait faire {possible}.",
+                     "“{nom}” runs at {actuel} although it can do {possible}."),
+    "opt.lent": _t("Prévenir quand un périphérique USB 3 est sur un port lent",
+                   "Warn when a USB 3 device is on a slow port"),
+    "lettre.titre": _t("Lettre fixe", "Fixed letter"),
+    "lettre.ok": _t("« {nom} » est maintenant en {lettre}:", "“{nom}” is now on {lettre}:"),
+    "lettre.differente": _t("« {nom} » est arrivé en {actuelle}: au lieu de {voulue}: — cliquez ici pour le "
+                            "remettre en {voulue}:.",
+                            "“{nom}” arrived on {actuelle}: instead of {voulue}: — click here to move it back "
+                            "to {voulue}:."),
+    "lettre.echec": _t("Impossible de donner la lettre {lettre}: ({detail}).",
+                       "Could not assign letter {lettre}: ({detail})."),
+    "lettre.plusieurs": _t("Ce périphérique a plusieurs lecteurs : la lettre fixe s'applique au premier ({lettre}:).",
+                           "This device has several drives: the fixed letter applies to the first one ({lettre}:)."),
+    "courant.ok": _t("Réglage enregistré : il prendra effet au prochain branchement de « {nom} ».",
+                     "Setting saved: it takes effect the next time “{nom}” is plugged in."),
+    "courant.echec": _t("Le réglage du courant n'a pas pu être écrit ({detail}).",
+                        "The power setting could not be written ({detail})."),
+    "programme.echec": _t("Le programme prévu pour « {nom} » n'a pas pu être lancé : {chemin}",
+                          "The program set for “{nom}” could not be started: {chemin}"),
+    "raccourci.pris": _t("Raccourci déjà pris par un autre programme : {texte}",
+                         "Shortcut already used by another program: {texte}"),
 }

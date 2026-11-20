@@ -5,13 +5,14 @@ import threading
 
 from PyQt6 import QtCore, QtGui, QtWidgets
 
-from . import __version__, reglages, systeme
+from . import __version__, reglages, systeme, usb
 from .i18n import definir_langue, langue, tr
 from .modele import taille_lisible
 from .modele import TYPES
-from .raccourci import CHOIX_MENU, CHOIX_TOUT
+from .raccourci import CHOIX_APPAREIL, CHOIX_MENU, CHOIX_TOUT
 
-COL_LETTRES, COL_ICONE, COL_NOM, COL_TYPE, COL_MATERIEL, COL_TAILLE, COL_BUS, COL_MASQUE = range(8)
+(COL_LETTRES, COL_ICONE, COL_NOM, COL_TYPE, COL_MATERIEL, COL_TAILLE, COL_BUS, COL_VITESSE, COL_MASQUE,
+ COL_OPTIONS) = range(10)
 
 
 class FenetreReglages(QtWidgets.QWidget):
@@ -23,7 +24,7 @@ class FenetreReglages(QtWidgets.QWidget):
         self.zone = zone
         self.qsettings = QtCore.QSettings("ARP273-ROSE", systeme.NOM)
         self.setWindowIcon(zone.icone)
-        self.resize(1000, 720)
+        self.resize(1100, 720)
         self._maj_signal.connect(self._resultat_maj)
         self._tache_signal.connect(self._etat_tache)
         self._ids_affiches = None
@@ -59,10 +60,10 @@ class FenetreReglages(QtWidgets.QWidget):
         # --- périphériques
         g = QtWidgets.QGroupBox(tr("fen.peripheriques"))
         gl = QtWidgets.QVBoxLayout(g)
-        self.table = QtWidgets.QTableWidget(0, 8)
+        self.table = QtWidgets.QTableWidget(0, 10)
         self.table.setHorizontalHeaderLabels([tr("col.lettres"), tr("col.icone"), tr("col.nom"), tr("col.type"),
                                               tr("col.materiel"), tr("col.taille"), tr("col.bus"),
-                                              tr("col.masquer")])
+                                              tr("col.vitesse"), tr("col.masquer"), tr("col.options")])
         self.table.verticalHeader().setVisible(False)
         self.table.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectionBehavior.SelectRows)
         self.table.itemChanged.connect(self._modif_table)
@@ -114,6 +115,7 @@ class FenetreReglages(QtWidgets.QWidget):
         self.c_compteur = self._case(ol, tr("opt.compteur"), self.r.compteur, "compteur")
         self.c_rappel = self._case(ol, tr("opt.rappel"), self.r.rappel_fermeture, "rappel_fermeture")
         self.c_rappel.setToolTip(tr("opt.rappel.aide"))
+        self.c_lent = self._case(ol, tr("opt.lent"), self.r.avertir_port_lent, "avertir_port_lent")
         self.c_demarrage = QtWidgets.QCheckBox(tr("opt.demarrage"))
         self.c_demarrage.setChecked(systeme.lance_avec_windows())
         self.c_demarrage.setEnabled(systeme.WINDOWS)
@@ -196,13 +198,14 @@ class FenetreReglages(QtWidgets.QWidget):
         for i, p in enumerate(perifs):
             valeurs = {COL_LETTRES: ", ".join(f"{l}:" for l in p.lettres),
                        COL_NOM: self.zone.nom(p), COL_MATERIEL: p.nom,
-                       COL_TAILLE: taille_lisible(p.taille, langue()), COL_BUS: p.bus}
+                       COL_TAILLE: taille_lisible(p.taille, langue()), COL_BUS: p.bus,
+                       COL_VITESSE: usb.lisible(p.vitesse[0]) + (" ⚠" if usb.bride(*p.vitesse) else "")}
             for col, texte in valeurs.items():
                 item = QtWidgets.QTableWidgetItem(texte)
                 if col != COL_NOM:
                     item.setFlags(item.flags() & ~QtCore.Qt.ItemFlag.ItemIsEditable)
                 item.setData(QtCore.Qt.ItemDataRole.UserRole, p.materiel)
-                item.setToolTip(p.id)
+                item.setToolTip(self.zone.vitesse_texte(p) if col == COL_VITESSE else p.id)
                 self.table.setItem(i, col, item)
             case = QtWidgets.QTableWidgetItem()
             case.setFlags(QtCore.Qt.ItemFlag.ItemIsUserCheckable | QtCore.Qt.ItemFlag.ItemIsEnabled)
@@ -230,11 +233,22 @@ class FenetreReglages(QtWidgets.QWidget):
             cb.setCurrentIndex(max(0, cb.findData(self.r.types.get(p.materiel, ""))))
             cb.currentIndexChanged.connect(lambda _i, cb=cb, mat=p.materiel: self._changer_type(mat, cb.currentData()))
             self.table.setCellWidget(i, COL_TYPE, cb)
+            if p.geste == "ejecter":
+                b = QtWidgets.QPushButton(tr("appareil.bouton"))
+                b.clicked.connect(lambda _=False, p=p: self.reglages_appareil(p))
+                self.table.setCellWidget(i, COL_OPTIONS, b)
         self.table.resizeColumnsToContents()
         entete = self.table.horizontalHeader()
         entete.setSectionResizeMode(COL_NOM, QtWidgets.QHeaderView.ResizeMode.ResizeToContents)
         entete.setSectionResizeMode(COL_MATERIEL, QtWidgets.QHeaderView.ResizeMode.Stretch)
+        entete.setMinimumSectionSize(40)
+        self.table.setColumnWidth(COL_TYPE, 200)
         self._remplissage = False
+
+    def reglages_appareil(self, p) -> None:
+        dlg = DialogueAppareil(self, p)
+        if dlg.exec() == QtWidgets.QDialog.DialogCode.Accepted:
+            dlg.appliquer()
 
     def rafraichir_si_change(self) -> None:
         ids = sorted(p.id for p in self.zone._derniers)
@@ -489,3 +503,109 @@ def systeme_logo():
     from pathlib import Path
     chemin = Path(__file__).resolve().parent.parent / "logo_128.png"
     return QtGui.QPixmap(str(chemin)) if chemin.exists() else None
+
+
+class DialogueAppareil(QtWidgets.QDialog):
+    """Lettre fixe, programme au branchement, raccourci d'éjection, coupure du courant."""
+
+    def __init__(self, fenetre: FenetreReglages, p):
+        super().__init__(fenetre)
+        self.fenetre, self.zone, self.p = fenetre, fenetre.zone, p
+        r = self.zone.reglages
+        mat = p.materiel
+        self.setWindowTitle(tr("appareil.titre", nom=self.zone.nom(p)))
+        self.setMinimumWidth(560)
+        lo = QtWidgets.QVBoxLayout(self)
+        form = QtWidgets.QFormLayout()
+        lo.addLayout(form)
+
+        # lettre fixe
+        self.cb_lettre = QtWidgets.QComboBox()
+        self.cb_lettre.addItem(tr("appareil.lettre.aucune"), "")
+        from . import peripheriques
+        actuelle = p.lettres[0] if p.lettres else ""
+        voulue = r.lettres_fixes.get(mat, "")
+        for l in sorted(set(peripheriques.lettres_libres()) | {actuelle, voulue} - {""}):
+            self.cb_lettre.addItem(f"{l}:", l)
+        self.cb_lettre.setCurrentIndex(max(0, self.cb_lettre.findData(voulue)))
+        self.cb_lettre.setEnabled(bool(p.lettres))
+        form.addRow(tr("appareil.lettre"), self.cb_lettre)
+        aide = QtWidgets.QLabel(tr("appareil.lettre.aide") + (
+            "\n" + tr("lettre.plusieurs", lettre=actuelle) if len(p.lettres) > 1 else ""))
+        aide.setWordWrap(True)
+        aide.setProperty("role", "sous-titre")
+        form.addRow(aide)
+
+        # programme au branchement
+        ligne = QtWidgets.QHBoxLayout()
+        self.e_programme = QtWidgets.QLineEdit(r.au_branchement.get(mat, ""))
+        self.e_programme.setReadOnly(True)
+        parcourir = QtWidgets.QPushButton(tr("appareil.parcourir"))
+        parcourir.clicked.connect(self._choisir_programme)
+        effacer = QtWidgets.QPushButton(tr("appareil.effacer"))
+        effacer.clicked.connect(self.e_programme.clear)
+        ligne.addWidget(self.e_programme, 1)
+        ligne.addWidget(parcourir)
+        ligne.addWidget(effacer)
+        form.addRow(tr("appareil.programme"), ligne)
+        aide = QtWidgets.QLabel(tr("appareil.programme.aide"))
+        aide.setWordWrap(True)
+        aide.setProperty("role", "sous-titre")
+        form.addRow(aide)
+
+        # raccourci
+        self.cb_raccourci = fenetre._combo(CHOIX_APPAREIL, r.raccourcis_appareils.get(mat, ""))
+        form.addRow(tr("appareil.raccourci"), self.cb_raccourci)
+
+        # vitesse et courant
+        form.addRow(tr("appareil.vitesse"), QtWidgets.QLabel(self.zone.vitesse_texte(p) or tr("vitesse.inconnue")))
+        self.c_courant = QtWidgets.QCheckBox(tr("appareil.courant"))
+        self.c_courant.setChecked(mat in r.courant_coupe)
+        self.c_courant.setEnabled(p.id.upper().startswith("USB\\"))
+        form.addRow(self.c_courant)
+        aide = QtWidgets.QLabel(tr("appareil.courant.aide"))
+        aide.setWordWrap(True)
+        aide.setProperty("role", "sous-titre")
+        form.addRow(aide)
+
+        boutons = QtWidgets.QDialogButtonBox()
+        ok = boutons.addButton(tr("appareil.ok"), QtWidgets.QDialogButtonBox.ButtonRole.AcceptRole)
+        ok.setProperty("role", "principal")
+        boutons.addButton(tr("dlg.annuler"), QtWidgets.QDialogButtonBox.ButtonRole.RejectRole)
+        boutons.accepted.connect(self.accept)
+        boutons.rejected.connect(self.reject)
+        lo.addWidget(boutons)
+
+    def _choisir_programme(self) -> None:
+        chemin, _f = QtWidgets.QFileDialog.getOpenFileName(
+            self, tr("appareil.programme"), "", tr("appareil.filtre") + " (*.exe *.bat *.cmd *.lnk *.ps1 *.py)")
+        if chemin:
+            self.e_programme.setText(chemin)
+
+    @staticmethod
+    def _poser(dico: dict, cle: str, valeur: str) -> None:
+        if valeur:
+            dico[cle] = valeur
+        else:
+            dico.pop(cle, None)
+
+    def appliquer(self) -> None:
+        """Enregistre ; les gestes qui touchent au système (lettre, courant) passent par l'UAC."""
+        r, p, mat = self.zone.reglages, self.p, self.p.materiel
+        lettre = self.cb_lettre.currentData() or ""
+        self._poser(r.lettres_fixes, mat, lettre)
+        self._poser(r.au_branchement, mat, self.e_programme.text().strip())
+        raccourci = self.cb_raccourci.currentData() or ""
+        changement_raccourci = raccourci != r.raccourcis_appareils.get(mat, "")
+        self._poser(r.raccourcis_appareils, mat, raccourci)
+        couper = self.c_courant.isChecked()
+        changement_courant = couper != (mat in r.courant_coupe)
+        reglages.enregistrer(r)
+        if changement_raccourci:
+            refuses = self.zone.appliquer_raccourcis()
+            if raccourci in refuses:
+                QtWidgets.QMessageBox.warning(self, systeme.NOM, tr("raccourci.pris", texte=raccourci))
+        if lettre and p.lettres and lettre not in p.lettres:
+            self.zone.changer_lettre(p, p.lettres[0], lettre)
+        if changement_courant:
+            self.zone.regler_courant(p, couper)

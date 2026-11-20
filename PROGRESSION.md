@@ -24,6 +24,17 @@ Kernel-PnP (événement 225), raccourcis globaux RegisterHotKey.
   Anti-gel : lecture en fil + WM_DEVICECHANGE. Tiroir CD/DVD (IOCTL_STORAGE_EJECT_MEDIA), démontage
   ISO/VHD (verbe Eject du Shell, puis Dismount-DiskImage) vérifié en CI sur un vrai VHD.
 
+- 0.4.0 (20/11/2026) : tout ce qui avait été proposé. Bouton « Réglages… » par appareil
+  (`fenetre.DialogueAppareil`) : lettre fixe (assistant « lettre », valeur « EK » = ancienne+nouvelle,
+  Delete/SetVolumeMountPoint côté élevé, Windows retient ensuite ; bulle « remettre K: » si arrivé
+  ailleurs), programme au branchement (droits utilisateur, `.exe` reçoit « E:\ »), raccourci par
+  appareil, coupure du courant (assistant « courant » → usbflags\VVVVPPPPRRRR DisableOnSoftRemove=1,
+  KB 2401954, écrit pour Vista/7 : usbhub3 peut l'ignorer). Vitesse USB réelle (`pipit/usb.py`,
+  IOCTL_USB_GET_NODE_CONNECTION_INFORMATION_EX/_V2 sur le hub, sans admin) + bulle « port lent ».
+  Remontage : 2e méthode = IOCTL_USB_HUB_CYCLE_PORT (admin, marche Win 8–11 d'après Uwe Sieber).
+  `--assistant` prend désormais 6 arguments (valeur ajoutée, « - » si aucune).
+  NON vérifié sur un vrai poste : lettre fixe, coupure du courant, cycle de port, vitesse réelle.
+
 ## Points d'architecture
 
 - `pipit/disques_windows.py` : SetupAPI (GUID_DEVINTERFACE_DISK) → numéro de disque,

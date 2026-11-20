@@ -145,7 +145,7 @@ def _console() -> None:
 
 def _lister(tout: bool) -> int:
     _console()
-    from pipit import peripheriques, reglages
+    from pipit import peripheriques, reglages, usb
     from pipit.i18n import langue
     from pipit.modele import regrouper, taille_lisible
     if tout:
@@ -159,7 +159,9 @@ def _lister(tout: bool) -> int:
     for p in peripheriques.lister(set(r.masques), r.internes_a_chaud, avec_masques=True):
         masque = " [masqué]" if p.materiel in {m.upper() for m in r.masques} else ""
         print(f"{','.join(l + ':' for l in p.lettres) or '-'}\t{p.nom}\t{p.type}\t{p.bus}\t"
-              f"{taille_lisible(p.taille, langue())}\t{p.id}{masque}")
+              f"{taille_lisible(p.taille, langue())}\t{usb.lisible(p.vitesse[0]) or '-'}"
+              f"{' (bridé : ' + usb.lisible(p.vitesse[1]) + ' possible)' if usb.bride(*p.vitesse) else ''}"
+              f"\t{p.id}{masque}")
     if tout:
         for ident, nom in peripheriques.en_attente_de_retrait():
             print(f"[éjecté, encore branché] {nom}\t{ident}")

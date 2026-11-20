@@ -166,5 +166,51 @@ def coupables(p: Peripherique, partout: bool = False) -> list | None:
     return [poignees.Coupable(**c) for c in r.get("coupables", [])]
 
 
+def changer_lettre(p: Peripherique, ancienne: str, nouvelle: str) -> dict:
+    """Lettre fixe : Windows la retient ensuite pour ce volume (une fenêtre UAC, une fois)."""
+    from . import assistant
+    return assistant.demander("lettre", p.id, ancienne.upper() + nouvelle.upper())
+
+
+def regler_courant(p: Peripherique, couper: bool) -> dict:
+    """Couper le courant du port après éjection (registre système : une fenêtre UAC)."""
+    from . import assistant
+    return assistant.demander("courant", p.id, "1" if couper else "0")
+
+
+def lettres_libres() -> list[str]:
+    """D à Z, sans celles déjà prises (lecteurs présents ou réseau)."""
+    prises: set[str] = set()
+    if not demo():
+        import ctypes
+        masque = ctypes.windll.kernel32.GetLogicalDrives()
+        prises = {chr(65 + i) for i in range(26) if masque & (1 << i)}
+    else:
+        prises = {l for d in tous_les_disques() for l in d.lettres} | {"C"}
+    return [chr(c) for c in range(ord("D"), ord("Z") + 1) if chr(c) not in prises]
+
+
+def lancer_programme(commande: str, lettre: str) -> bool:
+    """Programme choisi pour ce périphérique, lancé à son arrivée, avec les droits de
+    l'utilisateur (jamais élevé). Un .exe reçoit la racine du lecteur en argument."""
+    import subprocess
+    from pathlib import Path
+    chemin = Path(commande)
+    if not commande or not chemin.exists():
+        return False
+    racine = f"{lettre}:\\" if lettre else ""
+    try:
+        if chemin.suffix.lower() in (".exe", ".com"):
+            subprocess.Popen([str(chemin)] + ([racine] if racine else []),
+                             cwd=racine or None, close_fds=True)
+        elif sys.platform == "win32":
+            os.startfile(str(chemin))                # noqa: S606 — fichier choisi par l'utilisateur
+        else:
+            return False
+    except OSError:
+        return False
+    return True
+
+
 def fermer_tiroir(p: Peripherique) -> bool:
     return bool(p.lettres) and _moteur().fermer_tiroir(p.lettres[0])

@@ -214,6 +214,34 @@ dans le menu.
   matériel : Pipit s'en souvient même quand le périphérique est débranché.
 \end{itemize}
 
+\begin{itemize}
+\item \textbf{Vitesse USB} : la vitesse réelle du port (USB~2.0 — 480~Mbit/s, USB~3 — 5 ou
+  10~Gbit/s). Si un périphérique USB~3 tourne en USB~2 (port noir, rallonge, vieux câble),
+  Pipit l'écrit et prévient par une bulle à son arrivée : branchez-le sur un port bleu.
+\end{itemize}
+
+\subsection{Réglages d'un appareil}
+Le bouton \menu{Réglages…} au bout de chaque ligne ouvre les réglages propres à ce
+matériel ; Pipit les retient même débranché.
+
+\capture{../capture_appareil-fr.png}
+\begin{itemize}
+\item \textbf{Lettre fixe} : par exemple toujours \texttt{K:} pour le disque de sauvegarde.
+  Windows retient la lettre pour ce volume, comme la Gestion des disques : une seule
+  confirmation de Windows suffit. Si la lettre est occupée au branchement, l'appareil en
+  reçoit une autre ; Pipit propose alors, par une bulle, de remettre la bonne d'un clic.
+\item \textbf{Au branchement, lancer} : un programme ou un script ouvert à chaque arrivée
+  de l'appareil (logiciel de sauvegarde, de photos…). Un \texttt{.exe} reçoit la racine du
+  lecteur (\texttt{K:\textbackslash}). Il est lancé avec vos droits habituels, jamais en
+  administrateur.
+\item \textbf{Raccourci qui l'éjecte} : \touche{Ctrl}+\touche{Alt}+\touche{1} à
+  \touche{9} ou \touche{Win}+\touche{Alt}+\touche{1} à \touche{9}.
+\item \textbf{Couper le courant du port après l'éjection} : le voyant s'éteint, comme sous
+  Windows~XP. C'est un réglage du registre de Windows pour ce seul matériel (une
+  confirmation de Windows), effectif au branchement suivant. Microsoft l'a documenté pour
+  les ports USB~2 ; certains ports USB~3 l'ignorent.
+\end{itemize}
+
 \subsection{Raccourcis clavier}
 \begin{itemize}
 \item \textbf{Ouvrir le menu} : \touche{Win}+\touche{Alt} par défaut (le même que dans
@@ -242,7 +270,8 @@ choisissez-en un autre.
 \end{itemize}
 
 \subsection{Droits d'administrateur}\label{sec:assistant}
-Remonter un périphérique, forcer une éjection et « Chercher partout » demandent les droits
+Remonter un périphérique, forcer une éjection, « Chercher partout », la lettre fixe et la coupure du
+courant demandent les droits
 d'administrateur : Windows affiche sa fenêtre de confirmation (UAC) à chaque fois. C'est
 voulu. Pipit n'installe ni service ni tâche permanente qui garderait ces droits : aucun
 autre programme ne peut donc s'en servir en cachette. La partie administrateur ne reçoit

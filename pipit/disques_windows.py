@@ -379,6 +379,13 @@ def lister() -> list[Disque]:
             if a.id_ejectable not in vus:       # un téléphone vu en WPD ET en Image : une seule ligne
                 vus.add(a.id_ejectable)
                 disques.append(a)
+    from . import usb
+    vitesses: dict[str, tuple[int, int]] = {}
+    for d in disques:
+        if d.id_ejectable.upper().startswith("USB\\") and not d.systeme:
+            if d.id_ejectable not in vitesses:
+                vitesses[d.id_ejectable] = usb.vitesse(d.id_ejectable)
+            d.vitesse, d.vitesse_max = vitesses[d.id_ejectable]
     return disques
 
 

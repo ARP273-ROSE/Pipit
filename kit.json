@@ -53,7 +53,8 @@
     "interface_kit",
     "pipit.assistant",
     "pipit.poignees",
-    "pipit.admin_windows"
+    "pipit.admin_windows",
+    "pipit.usb"
   ],
   "icone_png": "logo_256.png",
   "nom_affiche_fr": "Pipit",

@@ -115,8 +115,11 @@ def remonter(ident: str) -> dict:
     if dn is None:
         return {"ok": False, "detail": "absent"}
     parent = dw._parent(dn)
+    from . import usb
     essais = [
         ("setup_ready", lambda: cfgmgr32.CM_Setup_DevNode(dn, CM_SETUP_DEVNODE_READY)),
+        # redémarrage du port USB : le moyen qui marche sous Windows 8 à 11 d'après les outils connus
+        ("cycle_port", lambda: usb.redemarrer_port(ident) if ident.upper().startswith("USB\\") else -1),
         ("reenum_dev", lambda: cfgmgr32.CM_Reenumerate_DevNode(
             dn, CM_REENUMERATE_RETRY_INSTALLATION | CM_REENUMERATE_SYNCHRONOUS)),
         ("reenum_parent", lambda: cfgmgr32.CM_Reenumerate_DevNode(
@@ -137,3 +140,31 @@ def remonter(ident: str) -> dict:
                 return {"ok": True, "methode": nom, "journal": journal}
         journal.append(f"{nom}:{cr}:{etat(ident)[1]}")
     return {"ok": False, "detail": "refus", "journal": journal}
+
+
+# ------------------------------------------------------------------ lettre fixe
+kernel32.GetVolumeNameForVolumeMountPointW.argtypes = [wintypes.LPCWSTR, wintypes.LPWSTR, wintypes.DWORD]
+kernel32.DeleteVolumeMountPointW.argtypes = [wintypes.LPCWSTR]
+kernel32.SetVolumeMountPointW.argtypes = [wintypes.LPCWSTR, wintypes.LPCWSTR]
+
+
+def lettres_prises() -> set[str]:
+    masque = kernel32.GetLogicalDrives()
+    return {chr(65 + i) for i in range(26) if masque & (1 << i)}
+
+
+def changer_lettre(ancienne: str, nouvelle: str) -> dict:
+    """Comme la Gestion des disques : Windows retient la nouvelle lettre pour ce volume
+    (base MountedDevices), elle revient à chaque branchement tant qu'elle est libre."""
+    if nouvelle in lettres_prises():
+        return {"ok": False, "detail": "prise"}
+    guid = ctypes.create_unicode_buffer(64)
+    if not kernel32.GetVolumeNameForVolumeMountPointW(f"{ancienne}:\\", guid, 64):
+        return {"ok": False, "detail": "volume"}
+    if not kernel32.DeleteVolumeMountPointW(f"{ancienne}:\\"):
+        return {"ok": False, "detail": f"retrait {ctypes.get_last_error()}"}
+    if kernel32.SetVolumeMountPointW(f"{nouvelle}:\\", guid.value):
+        return {"ok": True, "lettre": nouvelle}
+    erreur = ctypes.get_last_error()
+    kernel32.SetVolumeMountPointW(f"{ancienne}:\\", guid.value)     # on remet l'ancienne
+    return {"ok": False, "detail": f"pose {erreur}"}

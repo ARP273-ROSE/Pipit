@@ -15,6 +15,7 @@ WM_HOTKEY = 0x0312
 
 CHOIX_MENU = ["", "Win+Alt", "Win+Alt+E", "Ctrl+Alt+E", "Ctrl+Shift+E", "Win+Shift+E", "Ctrl+Alt+U"]
 CHOIX_TOUT = ["", "Ctrl+Alt+Shift+E", "Win+Alt+Shift+E", "Ctrl+Alt+Shift+U"]
+CHOIX_APPAREIL = [""] + [f"Ctrl+Alt+{i}" for i in range(1, 10)] + [f"Win+Alt+{i}" for i in range(1, 10)]
 
 
 def analyser(texte: str) -> tuple[int, int] | None:

@@ -35,6 +35,8 @@ def main():
     from pipit.zone import Zone
     zone = Zone(app)
     zone.reglages.noms["USB\\VID_0781&PID_558C"] = "Sauvegarde photo"
+    zone.actualiser(attendre=True)            # la liste est lue en arrière-plan : on l'attend
+    app.processEvents()
     for lg in ("fr", "en"):
         definir_langue(lg)
         if lg == "en":
@@ -54,9 +56,22 @@ def main():
         f.cb_langue.blockSignals(False)
         f._construire()
         f.rafraichir()
-        f.resize(1000, 720)
+        f.resize(1100, 720)
         app.processEvents()
         f.grab().save(str(ICI / f"capture_reglages-{lg}.png"))
+        # réglages d'un appareil
+        from pipit.fenetre import DialogueAppareil
+        cle = [q for q in zone._tous if "VID_0781" in q.id][0]
+        zone.reglages.lettres_fixes[cle.materiel] = "K"
+        zone.reglages.raccourcis_appareils[cle.materiel] = "Ctrl+Alt+1"
+        dlg = DialogueAppareil(f, cle)
+        dlg.e_programme.setText("C:\\Program Files\\FreeFileSync\\FreeFileSync.exe")
+        dlg.show()
+        app.processEvents()
+        dlg.grab().save(str(ICI / f"capture_appareil-{lg}.png"))
+        dlg.done(0)
+        zone.reglages.lettres_fixes.clear()
+        zone.reglages.raccourcis_appareils.clear()
         f.hide()
         # refus, avec le programme en cause
         p = zone.lister()[0]

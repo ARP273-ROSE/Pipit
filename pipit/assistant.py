@@ -13,9 +13,10 @@ Conception (après audit de sécurité de la 0.2.0) :
   lancé (GetNamedPipeServerProcessId). La clé seule ne suffit pas : la ligne de commande
   d'un processus élevé peut se lire depuis la session (PROCESS_QUERY_LIMITED_INFORMATION).
   Messages en JSON (recv_bytes), jamais pickle.
-* Le processus élevé ne croit pas ce qu'on lui envoie : il ne reçoit qu'une action et un
-  identifiant de périphérique, recalcule lui-même le périphérique et ses lettres, et
-  refuse tout ce qui n'est pas un périphérique externe éjectable (forcer, coupables) ou
+* Le processus élevé ne croit pas ce qu'on lui envoie : il ne reçoit qu'une action, un
+  identifiant de périphérique et une valeur au format strict (deux lettres, 0 ou 1), recalcule lui-même le périphérique et ses lettres, et
+  refuse tout ce qui n'est pas un périphérique externe éjectable (forcer, coupables,
+  lettre — seulement une lettre de ce périphérique —, courant) ou
   un périphérique éjecté encore branché, problème 47 (remonter).
 """
 from __future__ import annotations
@@ -32,13 +33,20 @@ from pathlib import Path
 from . import systeme
 
 ANCIENNE_TACHE = "Pipit\\Assistant"          # créée par la 0.2.0 : retirée dès que possible
-ACTIONS = ("remonter", "forcer", "coupables")
+ACTIONS = ("remonter", "forcer", "coupables", "lettre", "courant")
+# valeur jointe à la demande : « - » sauf lettre (ancienne + nouvelle, « EK ») et courant (« 1 » / « 0 »)
+_VALEURS = {"lettre": re.compile(r"^[D-Z]{2}$"), "courant": re.compile(r"^[01]$")}
 _ID_VALIDE = re.compile(r"^(USB|USBSTOR|SCSI|SD|STORAGE|1394|SBP2)\\[\w&#.{}\-\\]{3,200}$", re.I)
 _CANAL = re.compile(r"^\\\\\.\\pipe\\pipit-[0-9a-f]{32}$")
 
 
 def id_valide(ident: str) -> bool:
     return bool(_ID_VALIDE.match(ident or ""))
+
+
+def valeur_valide(action: str, valeur: str) -> bool:
+    motif = _VALEURS.get(action)
+    return bool(motif.match(valeur or "")) if motif else valeur == "-"
 
 
 def _sans_console() -> dict:
@@ -135,13 +143,13 @@ def _pid_du_bout(conn, cote: str) -> int:
 _un_a_la_fois = threading.Lock()
 
 
-def demander(action: str, ident: str, delai: float = 120.0) -> dict:
+def demander(action: str, ident: str, valeur: str = "-", delai: float = 120.0) -> dict:
     """Lance le processus élevé (fenêtre UAC) et attend sa réponse par le canal privé."""
-    if action not in ACTIONS or not id_valide(ident):
+    if action not in ACTIONS or not id_valide(ident) or not valeur_valide(action, valeur):
         return {"ok": False, "detail": "demande invalide"}
     if os.environ.get("PIPIT_DEMO") == "1" or sys.platform != "win32":
         from . import demo
-        return demo.assistant(action, ident)
+        return demo.assistant(action, ident, valeur)
     import json
     import time
     from multiprocessing.connection import Client, Listener
@@ -154,7 +162,7 @@ def demander(action: str, ident: str, delai: float = 120.0) -> dict:
             return {"ok": False, "detail": f"canal: {exc}"}
         try:
             script = Path(__file__).resolve().parent.parent / "run.py"
-            args = subprocess.list2cmdline([str(script), "--assistant", action, ident, canal, cle.hex(),
+            args = subprocess.list2cmdline([str(script), "--assistant", action, ident, valeur, canal, cle.hex(),
                                             str(os.getpid())])
             lance = _lancer_eleve(systeme.executable_fenetre(), args)
             if lance is None:
@@ -217,17 +225,26 @@ def _peripherique(ident: str, exiger_lettres: bool):
     return None
 
 
-def traiter(action: str, ident: str) -> dict:
-    if action not in ACTIONS or not id_valide(ident):
+def traiter(action: str, ident: str, valeur: str = "-") -> dict:
+    if action not in ACTIONS or not id_valide(ident) or not valeur_valide(action, valeur):
         return {"ok": False, "detail": "demande invalide"}
     if action == "remonter":
         from . import admin_windows
         if not admin_windows.en_attente_de_retrait(ident):
             return {"ok": False, "detail": "etat"}       # jamais un périphérique désactivé exprès
         return admin_windows.remonter(ident)
-    p = _peripherique(ident, exiger_lettres=(action == "coupables"))
+    p = _peripherique(ident, exiger_lettres=(action in ("coupables", "lettre")))
     if p is None:
         return {"ok": False, "detail": "peripherique"}
+    if action == "lettre":
+        ancienne, nouvelle = valeur[0], valeur[1]
+        if ancienne not in p.lettres or nouvelle == ancienne:
+            return {"ok": False, "detail": "lettre"}   # seulement une lettre de CE périphérique
+        from . import admin_windows
+        return admin_windows.changer_lettre(ancienne, nouvelle)
+    if action == "courant":
+        from . import usb
+        return usb.regler_courant(p.id, valeur == "1")
     if action == "forcer":
         from . import admin_windows
         return admin_windows.forcer(p.id, p.lettres)
@@ -239,15 +256,15 @@ def traiter(action: str, ident: str) -> dict:
 
 
 def executer(arguments: list[str]) -> int:
-    """run.py --assistant <action> <identifiant> <canal> <clé> <pid de Pipit> : processus élevé,
-    une seule demande, réponse au seul Pipit qui l'a lancé."""
-    if len(arguments) != 5:
+    """run.py --assistant <action> <identifiant> <valeur> <canal> <clé> <pid de Pipit> :
+    processus élevé, une seule demande, réponse au seul Pipit qui l'a lancé."""
+    if len(arguments) != 6:
         return 2
-    action, ident, canal, cle_hex, pid_pipit = arguments
+    action, ident, valeur, canal, cle_hex, pid_pipit = arguments
     if not _CANAL.match(canal) or not re.fullmatch(r"[0-9a-f]{64}", cle_hex) or not pid_pipit.isdigit():
         return 2
     try:
-        r = traiter(action, ident)
+        r = traiter(action, ident, valeur)
     except Exception as exc:                        # noqa: BLE001
         r = {"ok": False, "detail": f"{type(exc).__name__}: {exc}"}
     import json

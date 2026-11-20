@@ -24,6 +24,12 @@ class Reglages:
     optiques: bool = True                 # lecteurs CD/DVD (tiroir) et images ISO/VHD montées
     compteur: bool = True                 # nombre de périphériques sur l'icône
     rappel_fermeture: bool = False        # prévenir à la fermeture de session s'il reste des périphériques
+    # ---- 0.4.0 : réglages par appareil (clé = matériel USB\VID_xxxx&PID_yyyy)
+    lettres_fixes: dict[str, str] = field(default_factory=dict)        # lettre voulue
+    au_branchement: dict[str, str] = field(default_factory=dict)       # programme lancé à l'arrivée
+    raccourcis_appareils: dict[str, str] = field(default_factory=dict)  # raccourci qui éjecte cet appareil
+    courant_coupe: list[str] = field(default_factory=list)              # coupure du port après éjection
+    avertir_port_lent: bool = True        # USB 3 branché sur un port USB 2
 
 
 def _fichier():
