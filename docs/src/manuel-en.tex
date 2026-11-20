@@ -1,0 +1,213 @@
+\input{preambule}
+\usepackage[english]{babel}
+\usepackage[colorlinks=true,linkcolor=bordeaux,urlcolor=bordeaux]{hyperref}
+\hypersetup{pdftitle={Pipit — user guide},pdfauthor={},pdfcreator={Pipit}}
+\boite{astucebox}{orl}{or!85!black}{\faLightbulb}{Good to know}
+\boite{securitebox}{sapinl}{sapin}{\faShield*}{What Pipit never does}
+\boite{attentionbox}{alertl}{alert}{\faExclamationTriangle}{Warning}
+\newcommand{\astuce}[1]{\par\needspace{5\baselineskip}\begin{astucebox}#1\end{astucebox}}
+\newcommand{\attention}[1]{\par\needspace{5\baselineskip}\begin{attentionbox}#1\end{attentionbox}}
+\fancyhead[L]{\sffamily\small\color{bordeaux}\textbf{PIPIT — USER GUIDE}}
+\fancyhead[R]{\sffamily\small\color{summit}\leftmark}
+\input{version}
+
+\begin{document}
+
+\begin{titlepage}
+\centering
+\vspace*{2.2cm}
+\includegraphics[width=3.6cm]{../../logo_512.png}\par
+\vspace{8mm}
+{\sffamily\Huge\bfseries\color{bordeaux} PIPIT\par}
+\vspace{3mm}
+{\sffamily\LARGE\color{ink} Safely remove USB drives and memory cards\par}
+\vspace{2mm}
+{\sffamily\large\color{summit} User guide \textbullet{} version \versionpipit\par}
+\vspace{12mm}
+\begin{tcolorbox}[enhanced,width=0.82\linewidth,colback=skyl,colframe=sky,arc=4pt,boxrule=1.2pt,left=5mm,right=5mm,top=3mm,bottom=3mm]
+\sffamily\centering
+The pipit is a small, discreet meadow bird:\\
+Pipit stays next to the clock and only shows up when called.\\[2mm]
+\textbf{Click the icon} \quad → \quad \textbf{click the device} \quad → \quad \textbf{unplug}
+\end{tcolorbox}
+\vfill
+{\footnotesize\color{summit}\sffamily Windows 10 and 11 \textbullet{} free software (MIT licence)\par}
+\end{titlepage}
+
+\tableofcontents
+\newpage
+
+\section{What Pipit is for}
+
+Unplugging a USB stick or an external drive while Windows is still writing to it can
+damage files, or even the whole drive. Windows does have its “Safely Remove Hardware”
+icon, but it is hidden, does not say \emph{which} program is in the way when it
+refuses, and has no keyboard shortcut.
+
+Pipit does the same job, better organised:
+
+\begin{itemize}
+\item an icon next to the clock: one click shows the list, one click on a line ejects;
+\item a keyboard shortcut that works everywhere (\touche{Win}+\touche{Alt} by default);
+\item when Windows refuses, the name of the program in the way, and a button to close it;
+\item neither the Windows disk nor internal disks are ever offered.
+\end{itemize}
+
+Pipit is free and will stay free: no licence key, no “Pro” edition, no paid upgrade.
+
+\section{Installing}
+
+\begin{enumerate}
+\item Download \fichier{Pipit-Setup.exe} from
+  \url{https://github.com/ARP273-ROSE/Pipit/releases/latest}.
+\item Run it: it installs for your account, without an administrator prompt.
+\item On first start, Pipit asks two questions: whether to send incident reports, and
+  whether to start with Windows. Answer \menu{Yes} to the second: that is what keeps it
+  available whenever you plug in a drive.
+\end{enumerate}
+
+\astuce{If the icon does not show next to the clock, click the small \textbf{\^{}} arrow
+in the taskbar: Windows puts new icons there. Drag Pipit's icon onto the taskbar to keep
+it at hand.}
+
+\section{Removing a device}\label{sec:retirer}
+
+Click Pipit's icon (the green “eject” symbol) or press \touche{Win}+\touche{Alt}. The
+menu opens under the mouse:
+
+\capture[0.62]{../capture_menu-en.png}
+
+Each line shows the drive letter, its name and its size. \textbf{One click on the line
+ejects the device.} When it is done, a “Safe to remove” balloon appears: you can pull
+the cable.
+
+\begin{itemize}
+\item \menu{Eject all} removes everything in the list at once.
+\item \menu{Open in File Explorer} opens a drive's contents.
+\item \menu{Settings…} opens the window described in section~\ref{sec:reglages}.
+\end{itemize}
+
+\section{When Windows refuses}\label{sec:refus}
+
+Windows refuses to eject while a program keeps a file open on the device: a Word
+document, a photo in a viewer, a paused video… Pipit first tries again a second later
+(an antivirus scanning the stick often lets go on its own), then, if it still fails,
+says who is in the way:
+
+\capture[0.6]{../capture_refus-en.png}
+
+\begin{itemize}
+\item \menu{Close …} politely asks the program to close, exactly like the cross of its
+  window: if it has an unsaved document, it will offer to save it. Pipit then tries
+  again on its own.
+\item \menu{Try again} retries the ejection once you have closed what was needed.
+\end{itemize}
+
+Special cases:
+\begin{itemize}
+\item \textbf{File Explorer}: a window is open on the drive, or the preview pane shows one
+  of its files. Close that window; Pipit never closes File Explorer, which would take the
+  desktop and the taskbar with it;
+\item \textbf{an antivirus or Windows indexing}: wait a few seconds and try again;
+\item \textbf{no program named}: Windows did not record it. Close the documents opened
+  from the device.
+\end{itemize}
+
+\begin{securitebox}
+\begin{itemize}[leftmargin=4mm]
+\item force an ejection: if Windows refuses, nothing is removed;
+\item kill a program (your unsaved documents are protected);
+\item close File Explorer, the antivirus or a Windows program;
+\item offer the Windows disk;
+\item ask for administrator rights, install a driver or a service.
+\end{itemize}
+\end{securitebox}
+
+\section{Multi-slot card readers}
+
+A reader that takes both an SD and a CF card appears as a single device with several
+letters. Windows can only eject the whole reader: Pipit reminds you before doing so.
+
+\capture[0.6]{../capture_lecteur-en.png}
+
+Tick \menu{Don't ask again} if you only ever use one slot at a time.
+
+\section{Settings}\label{sec:reglages}
+
+\menu{Settings…} in the icon's menu opens this window. Closing it does not quit Pipit:
+the icon stays next to the clock. To really quit: \menu{Quit Pipit} in the menu.
+
+\capture{../capture_reglages-en.png}
+
+\subsection{Connected devices}
+\begin{itemize}
+\item \textbf{Displayed name}: double-click to give a meaningful name (“Photo backup”
+  rather than “SanDisk Extreme Pro USB Device”). Clear the name to go back to the
+  hardware one.
+\item \textbf{Hide}: the device no longer appears in the menu (a drive you never unplug,
+  for instance). Names and hiding are remembered per hardware model: Pipit remembers
+  them even while the device is unplugged.
+\end{itemize}
+
+\subsection{Keyboard shortcuts}
+\begin{itemize}
+\item \textbf{Open the menu}: \touche{Win}+\touche{Alt} by default (the same as in
+  USB Safely Remove), or another of your choice.
+\item \textbf{Eject all}: none by default, to avoid an accidental ejection.
+\end{itemize}
+If another program already uses the chosen shortcut, Pipit says so under the list:
+pick another one.
+
+\subsection{Options}
+\begin{itemize}
+\item \textbf{Notify when it is safe to unplug}: the confirmation balloon.
+\item \textbf{Ask before ejecting a multi-card reader}: see above.
+\item \textbf{Also show hot-plug internal disks}: Windows often presents internal SATA
+  disks as “removable”. Pipit hides them so that an internal disk is not ejected by
+  mistake; tick only if you have a removable drive bay.
+\item \textbf{Start Pipit with Windows}.
+\item \textbf{Language}: French, English, or that of Windows.
+\end{itemize}
+
+\section{Updates and incident reports}
+
+On start, Pipit quietly checks whether a new version exists, and offers it. Every update
+is \textbf{signed}: before installing it, Pipit checks that it really comes from its
+author and was not altered on the way.
+
+If Pipit crashes or freezes, and only if you agreed, a technical report is sent
+automatically (version, system, error trace; neither your files nor the list of your
+devices). \menu{Report a problem…} lets you write one yourself.
+
+\section{Command line}
+
+From a command prompt, in Pipit's folder:
+
+\begin{center}
+\begin{tabularx}{\linewidth}{>{\ttfamily\small}l X}
+\toprule
+\textrm{\textbf{Command}} & \textbf{Effect} \\
+\midrule
+run.py --list & lists what can be removed, without ejecting anything \\
+run.py --eject E & ejects the device holding drive E: \\
+run.py --discret & starts the icon only, without opening the settings \\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+\section{Frequently asked questions}
+
+\textbf{My external drive does not show up.} If it is connected through eSATA or a SATA
+bay, tick “Also show hot-plug internal disks”. If it is hidden, untick \menu{Hide} in the
+settings.
+
+\textbf{Do mice, keyboards or phones show up?} No: Pipit only lists drives (sticks, disks,
+memory cards). Everything else can be unplugged without precaution.
+
+\textbf{After ejection, the drive keeps spinning.} Depending on the enclosure, power is not
+cut; it is nonetheless properly unmounted. You can unplug it.
+
+\textbf{I want an ejected device back without unplugging it.} Unplug it and plug it back
+in: Windows cannot “re-insert” an ejected device.
+
+\end{document}

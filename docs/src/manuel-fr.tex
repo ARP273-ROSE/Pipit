@@ -1,0 +1,220 @@
+\input{preambule}
+\usepackage[french]{babel}
+\usepackage[colorlinks=true,linkcolor=bordeaux,urlcolor=bordeaux]{hyperref}
+\hypersetup{pdftitle={Pipit — manuel d'utilisation},pdfauthor={},pdfcreator={Pipit}}
+\boite{astucebox}{orl}{or!85!black}{\faLightbulb}{Bon à savoir}
+\boite{securitebox}{sapinl}{sapin}{\faShield*}{Ce que Pipit ne fait jamais}
+\boite{attentionbox}{alertl}{alert}{\faExclamationTriangle}{Attention}
+\newcommand{\astuce}[1]{\par\needspace{5\baselineskip}\begin{astucebox}#1\end{astucebox}}
+\newcommand{\attention}[1]{\par\needspace{5\baselineskip}\begin{attentionbox}#1\end{attentionbox}}
+\fancyhead[L]{\sffamily\small\color{bordeaux}\textbf{PIPIT — MANUEL}}
+\fancyhead[R]{\sffamily\small\color{summit}\leftmark}
+\input{version}
+
+\begin{document}
+
+\begin{titlepage}
+\centering
+\vspace*{2.2cm}
+\includegraphics[width=3.6cm]{../../logo_512.png}\par
+\vspace{8mm}
+{\sffamily\Huge\bfseries\color{bordeaux} PIPIT\par}
+\vspace{3mm}
+{\sffamily\LARGE\color{ink} Retirer une clé ou un disque USB sans risque\par}
+\vspace{2mm}
+{\sffamily\large\color{summit} Manuel d'utilisation \textbullet{} version \versionpipit\par}
+\vspace{12mm}
+\begin{tcolorbox}[enhanced,width=0.82\linewidth,colback=skyl,colframe=sky,arc=4pt,boxrule=1.2pt,left=5mm,right=5mm,top=3mm,bottom=3mm]
+\sffamily\centering
+Le pipit est un petit passereau discret des prés :\\
+Pipit reste près de l'horloge et ne se montre que quand on l'appelle.\\[2mm]
+\textbf{Clic sur l'icône} \quad → \quad \textbf{clic sur le périphérique} \quad → \quad \textbf{débrancher}
+\end{tcolorbox}
+\vfill
+{\footnotesize\color{summit}\sffamily Windows 10 et 11 \textbullet{} logiciel libre (licence MIT)\par}
+\end{titlepage}
+
+\tableofcontents
+\newpage
+
+\section{À quoi sert Pipit}
+
+Débrancher une clé USB ou un disque externe pendant que Windows écrit encore dessus peut
+abîmer des fichiers, voire tout le disque. Windows a bien son icône « Retirer le
+périphérique en toute sécurité », mais elle est cachée, ne dit pas \emph{quel} programme
+bloque quand elle refuse, et n'a pas de raccourci clavier.
+
+Pipit fait la même chose, en mieux rangé :
+
+\begin{itemize}
+\item une icône près de l'horloge : un clic montre la liste, un clic sur une ligne éjecte ;
+\item un raccourci clavier, actif partout (\touche{Win}+\touche{Alt} par défaut) ;
+\item quand Windows refuse, le nom du programme en cause, et un bouton pour le fermer ;
+\item ni le disque de Windows, ni les disques internes ne sont jamais proposés.
+\end{itemize}
+
+Pipit est gratuit et le restera : pas de licence, pas de version « Pro », pas de
+mise à jour payante.
+
+\section{Installer}
+
+\begin{enumerate}
+\item Télécharger \fichier{Pipit-Setup.exe} sur la page
+  \url{https://github.com/ARP273-ROSE/Pipit/releases/latest}.
+\item Le lancer : l'installation se fait pour votre compte, sans fenêtre
+  d'administrateur.
+\item Au premier lancement, Pipit pose deux questions : envoyer ou non les rapports
+  d'incident, et se lancer ou non avec Windows. Répondez \menu{Oui} à la seconde : c'est
+  ce qui le rend toujours disponible quand vous branchez une clé.
+\end{enumerate}
+
+\astuce{Si l'icône n'apparaît pas près de l'horloge, cliquez sur la petite flèche
+\textbf{\^{}} de la barre des tâches : Windows range là les icônes nouvelles. Faites
+glisser celle de Pipit dans la barre pour l'avoir toujours sous la main.}
+
+\section{Retirer un périphérique}\label{sec:retirer}
+
+Cliquez sur l'icône de Pipit (le symbole « éjecter » vert) ou appuyez sur
+\touche{Win}+\touche{Alt}. Le menu s'ouvre sous la souris :
+
+\capture[0.62]{../capture_menu-fr.png}
+
+Chaque ligne donne la lettre du lecteur, son nom et sa taille. \textbf{Un clic sur la
+ligne éjecte le périphérique.} Quand c'est fait, une bulle « Vous pouvez débrancher »
+apparaît : vous pouvez retirer le câble.
+
+\begin{itemize}
+\item \menu{Tout éjecter} retire tout ce qui est dans la liste, d'un coup.
+\item \menu{Ouvrir dans l'Explorateur} ouvre le contenu d'un lecteur.
+\item \menu{Réglages…} ouvre la fenêtre décrite section~\ref{sec:reglages}.
+\end{itemize}
+
+\section{Quand Windows refuse}\label{sec:refus}
+
+Windows refuse d'éjecter tant qu'un programme garde un fichier ouvert sur le
+périphérique : un document Word, une photo dans une visionneuse, une vidéo en pause…
+Pipit refait d'abord un essai une seconde plus tard (un antivirus qui examine la clé la
+lâche souvent tout seul), puis, s'il échoue encore, dit qui est en cause :
+
+\capture[0.6]{../capture_refus-fr.png}
+
+\begin{itemize}
+\item \menu{Fermer …} demande poliment au programme de se fermer, exactement comme la
+  croix de sa fenêtre : s'il a un document non enregistré, il vous le proposera. Pipit
+  réessaie ensuite tout seul.
+\item \menu{Réessayer} relance l'éjection, après que vous avez fermé vous-même ce qu'il
+  fallait.
+\end{itemize}
+
+Cas particuliers :
+\begin{itemize}
+\item \textbf{l'Explorateur de fichiers} : une fenêtre est ouverte sur le lecteur, ou le
+  volet d'aperçu affiche un de ses fichiers. Fermez cette fenêtre ; Pipit ne ferme jamais
+  l'Explorateur, qui emporterait avec lui le bureau et la barre des tâches ;
+\item \textbf{un antivirus ou l'indexation de Windows} : patientez quelques secondes et
+  réessayez ;
+\item \textbf{aucun programme nommé} : Windows ne l'a pas noté. Fermez les documents
+  ouverts depuis le périphérique.
+\end{itemize}
+
+\begin{securitebox}
+\begin{itemize}[leftmargin=4mm]
+\item forcer une éjection : si Windows refuse, rien n'est retiré ;
+\item fermer de force un programme (vos documents non enregistrés sont protégés) ;
+\item fermer l'Explorateur, l'antivirus ou un programme de Windows ;
+\item proposer le disque de Windows ;
+\item demander des droits d'administrateur, installer un pilote ou un service.
+\end{itemize}
+\end{securitebox}
+
+\section{Lecteurs de cartes à plusieurs fentes}
+
+Un lecteur qui accepte à la fois une carte SD et une carte CF apparaît comme un seul
+périphérique avec plusieurs lettres. Windows ne sait éjecter que le lecteur entier :
+Pipit vous le rappelle avant de le faire.
+
+\capture[0.6]{../capture_lecteur-fr.png}
+
+Cochez \menu{Ne plus demander} si vous n'utilisez qu'une fente à la fois.
+
+\section{Réglages}\label{sec:reglages}
+
+\menu{Réglages…} dans le menu de l'icône ouvre cette fenêtre. La fermer ne quitte pas
+Pipit : l'icône reste près de l'horloge. Pour quitter vraiment : \menu{Quitter Pipit}
+dans le menu.
+
+\capture{../capture_reglages-fr.png}
+
+\subsection{Périphériques branchés}
+\begin{itemize}
+\item \textbf{Nom affiché} : double-cliquez pour donner un nom parlant
+  (« Sauvegarde photo » plutôt que « SanDisk Extreme Pro USB Device »). Effacez le nom
+  pour revenir à celui du matériel.
+\item \textbf{Masquer} : le périphérique n'apparaît plus dans le menu (un disque que vous
+  ne débranchez jamais, par exemple). Nom et masquage sont retenus par modèle de
+  matériel : Pipit s'en souvient même quand le périphérique est débranché.
+\end{itemize}
+
+\subsection{Raccourcis clavier}
+\begin{itemize}
+\item \textbf{Ouvrir le menu} : \touche{Win}+\touche{Alt} par défaut (le même que dans
+  USB Safely Remove), ou un autre au choix.
+\item \textbf{Tout éjecter} : aucun par défaut, pour éviter une éjection par mégarde.
+\end{itemize}
+Si un autre programme utilise déjà le raccourci choisi, Pipit le signale sous la liste :
+choisissez-en un autre.
+
+\subsection{Options}
+\begin{itemize}
+\item \textbf{Prévenir quand on peut débrancher} : la bulle de confirmation.
+\item \textbf{Demander avant d'éjecter un lecteur multicarte} : voir plus haut.
+\item \textbf{Montrer aussi les disques internes branchés à chaud} : Windows présente
+  souvent les disques SATA internes comme « amovibles ». Pipit les cache pour éviter
+  d'éjecter un disque interne par erreur ; cochez seulement si vous avez un tiroir
+  ou une baie extractible.
+\item \textbf{Lancer Pipit au démarrage de Windows}.
+\item \textbf{Langue} : français, anglais, ou celle de Windows.
+\end{itemize}
+
+\section{Mises à jour et rapports d'incident}
+
+Pipit vérifie discrètement, au lancement, s'il existe une nouvelle version, et vous la
+propose. Chaque mise à jour est \textbf{signée} : avant de l'installer, Pipit vérifie
+qu'elle vient bien de son auteur et qu'elle n'a pas été modifiée en route.
+
+Si Pipit plante ou se fige, et seulement si vous l'avez accepté, un rapport technique
+part tout seul (version, système, trace de l'erreur ; ni vos fichiers, ni la liste de vos
+périphériques). \menu{Signaler un problème…} permet d'écrire soi-même.
+
+\section{Ligne de commande}
+
+Depuis une invite de commandes, dans le dossier de Pipit :
+
+\begin{center}
+\begin{tabularx}{\linewidth}{>{\ttfamily\small}l X}
+\toprule
+\textrm{\textbf{Commande}} & \textbf{Effet} \\
+\midrule
+run.py --lister & liste ce qui peut être retiré, sans rien éjecter \\
+run.py --ejecter E & éjecte le périphérique qui porte la lettre E: \\
+run.py --discret & lance l'icône seule, sans ouvrir les réglages \\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+\section{Questions fréquentes}
+
+\textbf{Mon disque externe n'apparaît pas.} S'il est branché en eSATA ou dans une baie
+SATA, cochez « Montrer aussi les disques internes branchés à chaud ». S'il est masqué,
+décochez \menu{Masquer} dans les réglages.
+
+\textbf{Une souris, un clavier, un téléphone apparaissent-ils ?} Non : Pipit ne liste que
+les disques (clés, disques, cartes mémoire). Le reste se débranche sans précaution.
+
+\textbf{Après l'éjection, le disque continue de tourner.} Selon le boîtier, l'alimentation
+n'est pas coupée ; il est pourtant bien démonté. Vous pouvez débrancher.
+
+\textbf{Je veux revoir un périphérique éjecté sans le débrancher.} Débranchez-le puis
+rebranchez-le : Windows ne sait pas « réinsérer » un périphérique éjecté.
+
+\end{document}
