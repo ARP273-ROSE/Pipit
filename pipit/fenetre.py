@@ -23,6 +23,8 @@ class FenetreReglages(QtWidgets.QWidget):
         self.setWindowIcon(zone.icone)
         self.resize(820, 600)
         self._maj_signal.connect(self._resultat_maj)
+        self._contenu = None
+        QtWidgets.QVBoxLayout(self).setContentsMargins(0, 0, 0, 0)
         self._construire()
 
     @property
@@ -31,10 +33,16 @@ class FenetreReglages(QtWidgets.QWidget):
 
     # ------------------------------------------------------------ construction
     def _construire(self) -> None:
-        if self.layout() is not None:
-            QtWidgets.QWidget().setLayout(self.layout())      # détache l'ancienne mise en page
+        # tout le contenu vit dans un widget remplaçable : on jette l'ancien plus tard
+        # (deleteLater), jamais pendant qu'un de ses signaux est en cours d'émission
+        if self._contenu is not None:
+            self.layout().removeWidget(self._contenu)
+            self._contenu.hide()
+            self._contenu.deleteLater()
+        self._contenu = QtWidgets.QWidget(self)
+        self.layout().addWidget(self._contenu)
         self.setWindowTitle(tr("fen.titre", version=__version__))
-        lo = QtWidgets.QVBoxLayout(self)
+        lo = QtWidgets.QVBoxLayout(self._contenu)
 
         titre = QtWidgets.QLabel(tr("fen.entete"))
         titre.setProperty("role", "titre")
@@ -210,6 +218,9 @@ class FenetreReglages(QtWidgets.QWidget):
         code = self.cb_langue.currentData()
         self.qsettings.setValue("langue", code)
         definir_langue(code if code in ("fr", "en") else None)
+        QtCore.QTimer.singleShot(0, self._reconstruire)
+
+    def _reconstruire(self) -> None:
         self._construire()
         self.rafraichir()
         self.zone.actualiser()

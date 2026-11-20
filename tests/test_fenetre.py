@@ -82,14 +82,18 @@ def test_raccourci_change(zone):
     assert reglages.charger().raccourci_menu == "Ctrl+Alt+E"
 
 
-def test_fenetre_en_anglais(zone):
+def test_fenetre_en_anglais(app, zone):
     zone.ouvrir_reglages()
     f = zone.fenetre
     f.cb_langue.setCurrentIndex(f.cb_langue.findData("en"))
+    assert attendre(app, lambda: "settings" in f.windowTitle())
+    for _ in range(5):
+        app.processEvents()           # l'ancien contenu est détruit ici, sans planter
     assert f.windowTitle().startswith("Pipit") and "settings" in f.windowTitle()
     zone.construire_menu()
     assert _textes(zone.menu)[0] == "Safely remove:"
     f.cb_langue.setCurrentIndex(f.cb_langue.findData("fr"))
+    assert attendre(app, lambda: "réglages" in f.windowTitle())
 
 
 def test_raison_du_refus(zone):
