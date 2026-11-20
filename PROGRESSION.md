@@ -35,7 +35,9 @@ Kernel-PnP (événement 225), raccourcis globaux RegisterHotKey.
   `--assistant` prend désormais 6 arguments (valeur ajoutée, « - » si aucune).
   0.4.1 : vitesse corrigée (bit 0 de _V2 ignoré → USB 3 affiché USB 2), vérifiée sur un vrai poste (X6 = USB 3 — 5 Gbit/s,
   flags 0x0B), cache par branchement, taille de secours GET_LENGTH_INFO. Sonde : `outils/sonde_vitesse.py`.
-  NON vérifié sur un vrai poste : lettre fixe, coupure du courant, cycle de port.
+  ✅ 20/11 : remontage vérifié sur un vrai poste (CFexpress éjectée puis remontée sans débrancher,
+  volume revenu ; méthode gagnante non relevée).
+  NON vérifié sur un vrai poste : lettre fixe, coupure du courant.
 
 ## Points d'architecture
 
