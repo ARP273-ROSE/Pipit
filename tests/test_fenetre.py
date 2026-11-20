@@ -169,8 +169,11 @@ def test_tout_ejecter_ne_touche_ni_tiroir_ni_iso(app, zone):
     assert restants == {"optique", "virtuel"} and not demo._tiroirs
 
 
-def test_reglages_par_appareil(app, zone, tmp_path):
+def test_reglages_par_appareil(app, zone, tmp_path, monkeypatch):
+    from PyQt6 import QtWidgets
     from pipit import demo
+    boites = []                     # sous Windows sans écran, RegisterHotKey échoue : boîte « pris »
+    monkeypatch.setattr(QtWidgets.QMessageBox, "warning", lambda *a, **k: boites.append(a))
     from pipit.fenetre import COL_OPTIONS, COL_VITESSE, DialogueAppareil
     zone.ouvrir_reglages()
     f = zone.fenetre
