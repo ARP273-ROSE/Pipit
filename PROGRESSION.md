@@ -8,9 +8,7 @@ Kernel-PnP (événement 225), raccourcis globaux RegisterHotKey.
 
 - 0.1.0 publiée le 20/11/2026 (Setup 43 Mo, archive de MAJ signée). Éjection réelle réussie sur un vrai poste (disque USB CFexpress, code 0, volume disparu).
 
-- 0.2.0 publiée le 20/11/2026 : éjection forcée, remontage, assistant administrateur
-  (tâche planifiée `Pipit\Assistant`, HighestAvailable, déclenchée par `schtasks /run`, échange par
-  fichiers `assistant/demande-*.json`), coupables par inventaire des poignées, types + icônes,
+- 0.2.0 publiée le 20/11/2026 (assistant par tâche planifiée : REMPLACÉ en 0.3.0, voir plus bas) : coupables par inventaire des poignées, types + icônes,
   thème clair/sombre, compteur sur l'icône, rappel à la fermeture de session.
   - Mesuré sur un vrai poste : sans droits d'administrateur, toutes les fonctions de remontage
     (CM_Setup_DevNode, CM_Reenumerate_DevNode) répondent CR_ACCESS_DENIED (51).
@@ -18,6 +16,13 @@ Kernel-PnP (événement 225), raccourcis globaux RegisterHotKey.
     fichier ouvert est trouvé), en 0,1 s.
   - NON vérifié sur un vrai poste : remontage en administrateur (quelle méthode de
     `admin_windows.remonter` marche), éjection forcée, téléphones/appareils photo.
+
+- 0.3.0 publiée le 20/11/2026 après audit + contre-audit de sécurité par un agent : la tâche planifiée
+  de la 0.2.0 était un contournement de l'UAC (code modifiable par l'utilisateur lancé avec les droits
+  élevés) → supprimée (cherchée et retirée au démarrage) ; chaque geste admin = une UAC ; canal nommé
+  aléatoire + clé + pid vérifié aux deux bouts, JSON ; le processus élevé recalcule le périphérique.
+  Anti-gel : lecture en fil + WM_DEVICECHANGE. Tiroir CD/DVD (IOCTL_STORAGE_EJECT_MEDIA), démontage
+  ISO/VHD (verbe Eject du Shell, puis Dismount-DiskImage) vérifié en CI sur un vrai VHD.
 
 ## Points d'architecture
 
