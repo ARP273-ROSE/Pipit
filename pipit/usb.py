@@ -110,10 +110,28 @@ def _ouvrir_hub(chemin: str, ecriture: bool):
     return None if h in (None, dw.INVALID_HANDLE) else h
 
 
+_cache: dict[str, tuple[int, int]] = {}
+
+
 def vitesse(id_usb: str) -> tuple[int, int]:
-    """(vitesse actuelle, meilleure vitesse possible) : 0 à 4, -1 si inconnue."""
+    """(vitesse actuelle, meilleure vitesse possible) : 0 à 4, -1 si inconnue. La vitesse ne
+    change pas tant que le périphérique reste branché : lue une fois par branchement (l'identifiant
+    d'instance change au rebranchement sur un autre port ; sur le même, la valeur reste juste)."""
     if sys.platform != "win32" or not id_usb.upper().startswith("USB\\"):
         return -1, -1
+    if id_usb not in _cache:
+        _cache[id_usb] = _vitesse(id_usb)
+    return _cache[id_usb]
+
+
+def oublier(ids_presents: set[str]) -> None:
+    """Retire du cache les périphériques débranchés (relecture au prochain branchement)."""
+    for i in list(_cache):
+        if i not in ids_presents:
+            del _cache[i]
+
+
+def _vitesse(id_usb: str) -> tuple[int, int]:
     try:
         hp = _hub_et_port(id_usb)
         if hp is None:
@@ -134,7 +152,11 @@ def vitesse(id_usb: str) -> tuple[int, int]:
             v2 = dw._ioctl(h, IOCTL_USB_GET_NODE_CONNECTION_INFORMATION_EX_V2,
                            struct.pack("<IIII", port, 16, 0x7, 0), 16)
             if v2 and len(v2) >= 16:
+                # bit 0 : fonctionne en SuperSpeed ; 1 : en est capable ; 2 et 3 : idem en SuperSpeed+.
+                # Le champ Speed de _EX dit « High » pour un périphérique SuperSpeed : seul _V2 tranche.
                 drapeaux = struct.unpack_from("<I", v2, 12)[0]
+                if drapeaux & 0x1:
+                    actuel = max(actuel, 3)
                 if drapeaux & 0x4:
                     actuel = 4
                 if drapeaux & 0x8:

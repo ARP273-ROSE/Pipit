@@ -1,5 +1,13 @@
 # Journal des versions — Pipit
 
+### 0.4.1
+
+- Vitesse USB juste : un périphérique USB 3 était affiché « USB 2.0 » (Windows répond « High » dans
+  la première réponse ; seul l'indicateur « fonctionne en SuperSpeed » de la seconde fait foi). Vérifié
+  sur un vrai SSD USB derrière deux concentrateurs : « USB 3 — 5 Gbit/s ».
+- Vitesse lue une fois par branchement (cache) ; taille de secours (IOCTL_DISK_GET_LENGTH_INFO) quand
+  un disque qui sort de veille ne répond pas à la première question.
+
 ### 0.4.0
 
 Réglages par appareil (bouton « Réglages… » de chaque ligne) :

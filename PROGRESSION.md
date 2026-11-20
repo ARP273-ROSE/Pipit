@@ -33,7 +33,9 @@ Kernel-PnP (événement 225), raccourcis globaux RegisterHotKey.
   IOCTL_USB_GET_NODE_CONNECTION_INFORMATION_EX/_V2 sur le hub, sans admin) + bulle « port lent ».
   Remontage : 2e méthode = IOCTL_USB_HUB_CYCLE_PORT (admin, marche Win 8–11 d'après Uwe Sieber).
   `--assistant` prend désormais 6 arguments (valeur ajoutée, « - » si aucune).
-  NON vérifié sur un vrai poste : lettre fixe, coupure du courant, cycle de port, vitesse réelle.
+  0.4.1 : vitesse corrigée (bit 0 de _V2 ignoré → USB 3 affiché USB 2), vérifiée sur un vrai poste (X6 = USB 3 — 5 Gbit/s,
+  flags 0x0B), cache par branchement, taille de secours GET_LENGTH_INFO. Sonde : `outils/sonde_vitesse.py`.
+  NON vérifié sur un vrai poste : lettre fixe, coupure du courant, cycle de port.
 
 ## Points d'architecture
 

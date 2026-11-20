@@ -32,6 +32,7 @@ DIGCF_PRESENT, DIGCF_DEVICEINTERFACE = 0x2, 0x10
 IOCTL_STORAGE_GET_DEVICE_NUMBER = 0x2D1080
 IOCTL_STORAGE_QUERY_PROPERTY = 0x2D1400
 IOCTL_DISK_GET_DRIVE_GEOMETRY_EX = 0x700A0
+IOCTL_DISK_GET_LENGTH_INFO = 0x7405C
 FILE_SHARE_RW = 0x1 | 0x2
 OPEN_EXISTING = 3
 FILE_DEVICE_DISK = 7
@@ -171,9 +172,13 @@ def _ssd(h) -> bool | None:
 
 def _taille(h) -> int:
     r = _ioctl(h, IOCTL_DISK_GET_DRIVE_GEOMETRY_EX, taille_sortie=256)
-    if not r or len(r) < 32:
-        return 0                                   # lecteur de cartes vide : pas de support
-    return struct.unpack_from("<q", r, 24)[0]
+    if r and len(r) >= 32:
+        return struct.unpack_from("<q", r, 24)[0]
+    # secours (disque qui sort de veille, vu sur un SSD USB derrière deux concentrateurs)
+    r = _ioctl(h, IOCTL_DISK_GET_LENGTH_INFO, taille_sortie=8)
+    if r and len(r) >= 8:
+        return struct.unpack_from("<q", r, 0)[0]
+    return 0                                       # lecteur de cartes vide : pas de support
 
 
 def _id(devinst: int) -> str:
@@ -386,6 +391,7 @@ def lister() -> list[Disque]:
             if d.id_ejectable not in vitesses:
                 vitesses[d.id_ejectable] = usb.vitesse(d.id_ejectable)
             d.vitesse, d.vitesse_max = vitesses[d.id_ejectable]
+    usb.oublier(set(vitesses))
     return disques
 
 
