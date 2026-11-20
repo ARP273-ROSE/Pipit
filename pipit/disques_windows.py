@@ -305,6 +305,15 @@ def _nom(devinst: int, desc: dict, defaut: str) -> str:
                             or " ".join(x for x in (desc.get("fabricant"), desc.get("modele")) if x) or defaut))
 
 
+def _sous_un_volume(devinst: int, jusqua: int) -> bool:
+    n, garde = _parent(devinst), 0
+    while n is not None and n != jusqua and garde < 16:
+        if _id(n).upper().startswith("STORAGE\\VOLUME"):
+            return True
+        n, garde = _parent(n), garde + 1
+    return False
+
+
 def _appareils(guid, genre: str) -> list[Disque]:
     """Appareils d'une classe (téléphones, appareils photo) : présents, avec un ancêtre amovible."""
     hdev = setupapi.SetupDiGetClassDevsW(ctypes.byref(guid), None, None, DIGCF_PRESENT)
@@ -322,11 +331,13 @@ def _appareils(guid, genre: str) -> list[Disque]:
             ancetre = _ancetre_amovible(info.DevInst)
             if ancetre is None:
                 continue
+            # seulement un vrai appareil USB : pas une imprimante-scanner réseau (SWD\ESCL,
+            # SWD\DAFWSDPROVIDER, ROOT\IMAGE…), pas la vue WPD d'un disque (parent STORAGE\Volume)
+            if not _id(ancetre).upper().startswith("USB\\") or _sous_un_volume(info.DevInst, ancetre):
+                continue
             ident = _id(info.DevInst)
-            bus = "USB" if ident.upper().startswith(("USB", "SWD\\WPDBUSENUM\\_??_USB")) or \
-                "USB" in _id(ancetre).upper() else "?"
             p = _parent(ancetre)
-            trouves.append(Disque(-1, _nom(info.DevInst, {}, genre), bus, id_disque=ident,
+            trouves.append(Disque(-1, _nom(info.DevInst, {}, genre), "USB", id_disque=ident,
                                   id_ejectable=_id(ancetre), id_parent=_id(p) if p is not None else "",
                                   appareil=genre))
     finally:

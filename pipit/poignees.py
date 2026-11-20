@@ -172,7 +172,15 @@ def _chercher(lettres: set[str], fermer: bool) -> list[Coupable]:
         for h in processus.values():
             if h:
                 kernel32.CloseHandle(h)
-    return sorted(trouves.values(), key=lambda c: c.programme.lower())
+    return filtrer(trouves.values())
+
+
+def filtrer(coupables) -> list[Coupable]:
+    """L'Explorateur surveille la racine de chaque lecteur (notifications de changement) et la
+    lâche tout seul à l'éjection : ce n'est pas un coupable tant qu'il ne tient que la racine."""
+    garde = [c for c in coupables
+             if not (c.programme.lower() == "explorer.exe" and all(len(f.rstrip("\\")) <= 2 for f in c.fichiers))]
+    return sorted(garde, key=lambda c: c.programme.lower())
 
 
 def chercher(lettres: list[str], fermer: bool = False, delai: float = 20.0) -> list[Coupable] | None:

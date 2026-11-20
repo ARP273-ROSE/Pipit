@@ -66,6 +66,27 @@ class Resultat:
         self.bloqueurs = self.bloqueurs or []
 
 
+def _fichier_noms():
+    from . import systeme
+    return systeme.dossier_donnees() / "ejectes.json"
+
+
+def memoriser(p: Peripherique) -> None:
+    """Retient le nom d'un périphérique éjecté : une fois éjecté, Windows ne donne plus que
+    le nom générique du pilote (« Dispositif de stockage de masse UAS »)."""
+    import json
+    try:
+        noms = json.loads(_fichier_noms().read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        noms = {}
+    noms[p.id] = p.nom
+    try:
+        _fichier_noms().write_text(json.dumps(dict(list(noms.items())[-50:]), ensure_ascii=False),
+                                   encoding="utf-8")
+    except OSError:
+        pass
+
+
 def ejecter(p: Peripherique, essais: int = 2) -> Resultat:
     """Éjecte ; en cas de refus, refait un essai (un antivirus qui scanne la clé la lâche
     souvent dans la seconde) puis cherche qui retient le périphérique."""
@@ -74,6 +95,7 @@ def ejecter(p: Peripherique, essais: int = 2) -> Resultat:
     for i in range(essais):
         veto, nom = _moteur().ejecter(p.id)
         if veto == 0:
+            memoriser(p)
             return Resultat(True)
         if veto == VETO_DEJA_RETIRE:
             return Resultat(True, veto)
@@ -93,10 +115,16 @@ def ejecter(p: Peripherique, essais: int = 2) -> Resultat:
 # ------------------------------------------------------------------ éjectés, encore branchés
 def en_attente_de_retrait() -> list[tuple[str, str]]:
     """[(identifiant, nom)] : éjectés mais pas débranchés, donc remontables."""
+    import json
     try:
-        return _moteur().en_attente_de_retrait()
+        liste = _moteur().en_attente_de_retrait()
     except Exception:                                   # noqa: BLE001
         return []
+    try:
+        noms = json.loads(_fichier_noms().read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        noms = {}
+    return [(i, noms.get(i) or n) for i, n in liste]
 
 
 def remonter(ident: str) -> dict:
@@ -106,7 +134,10 @@ def remonter(ident: str) -> dict:
 
 def forcer(p: Peripherique) -> dict:
     from . import assistant
-    return assistant.demander("forcer", p.id, p.lettres)
+    r = assistant.demander("forcer", p.id, p.lettres)
+    if r.get("ok"):
+        memoriser(p)
+    return r
 
 
 def coupables(p: Peripherique, partout: bool = False) -> list | None:

@@ -190,3 +190,18 @@ def test_assistant_traite_ses_fichiers(donnees):
     assert assistant.executer() == 0
     r = json.loads((assistant.dossier() / "reponse-essai.json").read_text(encoding="utf-8"))
     assert r["ok"] and r["coupables"][0]["programme"] == "WINWORD.EXE"
+
+
+def test_nom_retenu_apres_ejection(monkeypatch):
+    from pipit import demo
+    p = [p for p in peripheriques.lister() if "VID_0951" in p.id][0]
+    assert peripheriques.ejecter(p).ok
+    demo._en_attente[p.id] = "Dispositif de stockage de masse UAS (USB Attached SCSI)"
+    assert peripheriques.en_attente_de_retrait() == [(p.id, "Kingston DataTraveler 3.0")]
+
+
+def test_explorateur_sur_la_racine_seule_pas_coupable():
+    from pipit import poignees
+    garde = poignees.filtrer([poignees.Coupable(1, "explorer.exe", fichiers=["I:\\", "I:\\"]),
+                              poignees.Coupable(2, "explorer.exe", fichiers=["I:\\Photos\\a.jpg"])])
+    assert [c.pid for c in garde] == [2]
