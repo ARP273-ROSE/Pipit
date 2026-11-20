@@ -40,13 +40,25 @@ def test_journal_du_systeme_lisible():
     assert bloqueurs.chercher(time.time() - 60) == [] or True    # ne lève pas, ne bloque pas
 
 
-def test_raccourci_global_enregistre():
-    from PyQt6 import QtWidgets
-    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])  # noqa: F841
-    w = QtWidgets.QWidget()
+def _vraie_fenetre():
+    """Une vraie fenêtre Win32 : en mode Qt « offscreen », winId() n'est pas un HWND."""
+    import ctypes
+    from ctypes import wintypes
+    u = ctypes.windll.user32
+    u.CreateWindowExW.restype = wintypes.HWND
+    u.CreateWindowExW.argtypes = [wintypes.DWORD, wintypes.LPCWSTR, wintypes.LPCWSTR, wintypes.DWORD,
+                                  ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int,
+                                  wintypes.HWND, wintypes.HMENU, wintypes.HINSTANCE, wintypes.LPVOID]
+    hwnd = u.CreateWindowExW(0, "STATIC", "pipit-essai", 0, 0, 0, 1, 1, None, None, None, None)
+    assert hwnd
+    return hwnd
+
+
+@pytest.mark.parametrize("texte", ["Ctrl+Alt+Shift+F11", "Win+Alt"])
+def test_raccourci_global_enregistre(texte):
     from pipit.raccourci import Raccourcis
-    r = Raccourcis(int(w.winId()))
-    assert r.ajouter("Ctrl+Alt+Shift+F11", lambda: None)
+    r = Raccourcis(_vraie_fenetre())
+    assert r.ajouter(texte, lambda: None), texte
     r.tout_retirer()
 
 
