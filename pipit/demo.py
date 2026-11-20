@@ -9,6 +9,7 @@ import os
 from .modele import Disque
 
 _retires: set[str] = set()
+_en_attente: dict[str, str] = {}
 
 _DISQUES = [
     Disque(0, "Samsung SSD 990 PRO 2TB", "NVMe", 2_000_398_934_016, ["C"], ["Windows"],
@@ -23,6 +24,11 @@ _DISQUES = [
            "USBSTOR\\DISK&VEN_GENERIC&PROD_CF\\7", "USB\\VID_05E3&PID_0749\\0000", "USB\\ROOT_HUB30\\5", True),
     Disque(5, "Kingston DataTraveler 3.0", "USB", 31_037_849_600, ["G"], ["CLE"],
            "USBSTOR\\DISK&VEN_KINGSTON\\8", "USB\\VID_0951&PID_1666\\BB02", "USB\\ROOT_HUB30\\5", True),
+    Disque(6, "Samsung Portable SSD T7", "USB", 1_000_204_886_016, ["H"], ["MONTAGE"],
+           "SCSI\\DISK&VEN_SAMSUNG&PROD_PORTABLE_SSD_T7\\9", "USB\\VID_04E8&PID_4001\\CC03",
+           "USB\\ROOT_HUB30\\5", False, ssd=True),
+    Disque(-1, "Apple iPad", "USB", 0, [], [], "SWD\\WPDBUSENUM\\IPAD", "USB\\VID_05AC&PID_12AB\\DD04",
+           "USB\\ROOT_HUB30\\5", appareil="telephone"),
 ]
 
 
@@ -36,11 +42,30 @@ def ejecter(id_ejectable: str) -> tuple[int, str]:
     if os.environ.get("PIPIT_DEMO_REFUS") == "1":
         return 5, "STORAGE\\VOLUME\\{demo}"
     _retires.add(id_ejectable)
+    _en_attente[id_ejectable] = next((d.nom for d in _DISQUES if d.id_ejectable == id_ejectable), "?")
     return 0, ""
 
 
 def remettre() -> None:
     _retires.clear()
+    _en_attente.clear()
+
+
+def en_attente_de_retrait() -> list[tuple[str, str]]:
+    return list(_en_attente.items())
+
+
+def assistant(action: str, ident: str, lettres: list[str]) -> dict:
+    if action == "remonter":
+        _retires.discard(ident)
+        _en_attente.pop(ident, None)
+        return {"ok": True, "methode": "demo"}
+    if action == "forcer":
+        _retires.add(ident)
+        _en_attente[ident] = "?"
+        return {"ok": True}
+    return {"ok": True, "coupables": [{"pid": 4242, "programme": "WINWORD.EXE", "chemin_programme": "",
+                                        "fichiers": [f"{(lettres or ['E'])[0]}:\\Rapport.docx"]}]}
 
 
 def bloqueurs():

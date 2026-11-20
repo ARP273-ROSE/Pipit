@@ -1,56 +1,76 @@
-"""Apparence figée de Pipit (standard du kit : rien ne dépend du thème
-de Windows). Vert olive du pipit des prés et blanc, rouge brique pour les alertes."""
+"""Apparence de Pipit : thème clair ou sombre, choisi dans les réglages.
+
+Le standard du kit veut que l'application décide de son apparence, pas Windows : le
+choix appartient à l'utilisateur (sombre par défaut, comme le menu qu'il avait avant),
+jamais au thème du système. Vert olive du pipit des prés, rouge brique pour les alertes.
+"""
 from __future__ import annotations
 
 from pathlib import Path
 
 POLICES = Path(__file__).resolve().parent / "polices"
 
-CIEL = "#4E6E2A"
-CIEL_FONCE = "#3A5420"
-ALERTE = "#B5382B"
 VERT = "#2E7D32"
 ORANGE = "#B26A00"
+ALERTE = "#B5382B"
 GRIS = "#6B7785"
 
-COULEURS = {
-    "fenetre": "#F4F6F9", "texte": "#1F2933", "base": "#FFFFFF", "base_alt": "#F1F5FA",
-    "bouton": "#E9EEF4", "texte_bouton": "#1F2933", "selection": "#DCE8C8",
-    "texte_selection": "#24331A", "lien": CIEL, "infobulle": "#FFFFFF",
-    "texte_infobulle": "#1F2933", "desactive": "#98A2AE", "clair": "#FFFFFF",
-    "moyen": "#C9D2DC", "sombre": "#9AA6B2",
+THEMES = {
+    "clair": {
+        "olive": "#4E6E2A", "olive_fonce": "#3A5420", "accent_doux": "#DCE8C8",
+        "couleurs": {
+            "fenetre": "#F4F6F2", "texte": "#1F2933", "base": "#FFFFFF", "base_alt": "#F3F6EE",
+            "bouton": "#E9EEE4", "texte_bouton": "#1F2933", "selection": "#DCE8C8",
+            "texte_selection": "#24331A", "lien": "#4E6E2A", "infobulle": "#FFFFFF",
+            "texte_infobulle": "#1F2933", "desactive": "#98A2AE", "clair": "#FFFFFF",
+            "moyen": "#C9D2C4", "sombre": "#9AA69A",
+        },
+        "cadre": "#D5DDD0", "fond_groupe": "#FFFFFF", "entete": "#EEF2EA", "survol": "#F8FBF2",
+        "bouton_fond": "#FFFFFF", "bouton_bord": "#C2CCBC", "gris": "#6B7785",
+    },
+    "sombre": {
+        "olive": "#7FA04A", "olive_fonce": "#5E7C33", "accent_doux": "#3A4A2A",
+        "couleurs": {
+            "fenetre": "#1E2124", "texte": "#E4E7EA", "base": "#26292D", "base_alt": "#2C3035",
+            "bouton": "#2F3338", "texte_bouton": "#E4E7EA", "selection": "#4A5E30",
+            "texte_selection": "#F2F6EC", "lien": "#A5C46E", "infobulle": "#2F3338",
+            "texte_infobulle": "#E4E7EA", "desactive": "#6E757D", "clair": "#3A3F45",
+            "moyen": "#2A2E33", "sombre": "#15171A",
+        },
+        "cadre": "#3A3F45", "fond_groupe": "#24272B", "entete": "#2C3035", "survol": "#2E3530",
+        "bouton_fond": "#2F3338", "bouton_bord": "#474D54", "gris": "#9AA3AD",
+    },
 }
 
-FEUILLE = f"""
-QListWidget#navigation {{ background: #E6ECF3; border: none; padding: 6px; font-size: 11pt; }}
-QListWidget#navigation::item {{ padding: 9px 10px; border-radius: 6px; margin: 1px 0; }}
-QListWidget#navigation::item:selected {{ background: {CIEL}; color: white; }}
-QPushButton {{ padding: 6px 14px; border: 1px solid #C2CCD7; border-radius: 5px; background: #FFFFFF; }}
-QPushButton:hover {{ border-color: {CIEL}; }}
-QPushButton:disabled {{ color: #98A2AE; background: #EEF1F5; }}
-QPushButton[role="principal"] {{ background: {CIEL}; color: white; border-color: {CIEL_FONCE}; font-weight: 600; }}
-QPushButton[role="principal"]:hover {{ background: {CIEL_FONCE}; }}
-QPushButton[role="principal"]:disabled {{ background: #A9BC8E; color: #EEF4FA; }}
-QPushButton[role="carte"] {{ text-align: left; padding: 14px; background: white; border: 1px solid #D5DDE6; border-radius: 10px; }}
-QPushButton[role="carte"]:hover {{ border: 1px solid {CIEL}; background: #F8FBF2; }}
-QLabel[role="titre"] {{ font-size: 17pt; font-weight: 700; color: {CIEL_FONCE}; }}
-QLabel[role="sous-titre"] {{ color: {GRIS}; font-size: 10.5pt; }}
-QLabel#avertissement {{ background: #FFF4D6; border: 1px solid #E8C770; border-radius: 6px; padding: 8px 10px; }}
-QFrame#bandeau {{ background: #FFF4D6; border: 1px solid #E8C770; border-radius: 6px; }}
-QGroupBox {{ font-weight: 600; border: 1px solid #D5DDE6; border-radius: 8px; margin-top: 12px; padding-top: 10px; background: white; }}
-QGroupBox::title {{ subcontrol-origin: margin; left: 10px; padding: 0 4px; color: {CIEL_FONCE}; }}
-QTableWidget {{ gridline-color: #E3E8EE; border: 1px solid #D5DDE6; }}
-QHeaderView::section {{ background: #EEF2F7; padding: 5px; border: none; border-bottom: 1px solid #D5DDE6; font-weight: 600; }}
-QProgressBar#progres {{ min-height: 20px; max-height: 20px; border-radius: 6px; text-align: center; font-weight: 600; }}
-QLabel#etat {{ font-weight: 600; }}
-QLabel#etape {{ color: #4A5D72; }}
-QPlainTextEdit#console {{ background: #10263D; color: #DDE7F2; font-family: Consolas, "DejaVu Sans Mono", monospace; font-size: 9pt; border-radius: 6px; }}
-QProgressBar {{ border: 1px solid #C2CCD7; border-radius: 4px; text-align: center; height: 14px; background: white; }}
-QProgressBar::chunk {{ background: {CIEL}; }}
+
+def feuille(t: dict) -> str:
+    return f"""
+QPushButton {{ padding: 6px 14px; border: 1px solid {t['bouton_bord']}; border-radius: 5px; background: {t['bouton_fond']}; }}
+QPushButton:hover {{ border-color: {t['olive']}; }}
+QPushButton:disabled {{ color: {t['couleurs']['desactive']}; }}
+QPushButton[role="principal"] {{ background: {t['olive']}; color: white; border-color: {t['olive_fonce']}; font-weight: 600; }}
+QPushButton[role="principal"]:hover {{ background: {t['olive_fonce']}; }}
+QLabel[role="titre"] {{ font-size: 17pt; font-weight: 700; color: {t['olive']}; }}
+QLabel[role="sous-titre"] {{ color: {t['gris']}; font-size: 10.5pt; }}
+QGroupBox {{ font-weight: 600; border: 1px solid {t['cadre']}; border-radius: 8px; margin-top: 12px; padding-top: 10px; background: {t['fond_groupe']}; }}
+QGroupBox::title {{ subcontrol-origin: margin; left: 10px; padding: 0 4px; color: {t['olive']}; }}
+QTableWidget {{ gridline-color: {t['cadre']}; border: 1px solid {t['cadre']}; }}
+QHeaderView::section {{ background: {t['entete']}; padding: 5px; border: none; border-bottom: 1px solid {t['cadre']}; font-weight: 600; }}
+QMenu {{ background: {t['couleurs']['base']}; border: 1px solid {t['cadre']}; padding: 4px; }}
+QMenu::item {{ padding: 6px 26px 6px 10px; border-radius: 4px; }}
+QMenu::item:selected {{ background: {t['olive']}; color: white; }}
+QMenu::item:disabled {{ color: {t['gris']}; }}
+QMenu::separator {{ height: 1px; background: {t['cadre']}; margin: 4px 6px; }}
+QMenu::icon {{ padding-left: 6px; }}
 """
 
 
-def appliquer(app) -> None:
+def theme(nom: str) -> dict:
+    return THEMES.get(nom) or THEMES["sombre"]
+
+
+def appliquer(app, nom: str = "sombre") -> None:
     import interface_kit
-    interface_kit.appliquer_style(app, COULEURS, polices=POLICES, famille="Source Sans 3",
-                                  taille=10.0, feuille=FEUILLE, sombre=False)
+    t = theme(nom)
+    interface_kit.appliquer_style(app, t["couleurs"], polices=POLICES, famille="Source Sans 3",
+                                  taille=10.0, feuille=feuille(t), sombre=(nom == "sombre"))

@@ -40,11 +40,12 @@ def main():
         if lg == "en":
             zone.reglages.noms["USB\\VID_0781&PID_558C"] = "Photo backup"
         # menu de l'icône
-        zone.construire_menu()
-        zone.menu.popup(QtCore.QPoint(10, 10))
-        app.processEvents()
-        zone.menu.grab().save(str(ICI / f"capture_menu-{lg}.png"))
-        zone.menu.hide()
+        for menu, complet, nom in ((zone.menu, False, "menu"), (zone.menu_complet, True, "menu_complet")):
+            zone.construire_menu(menu, complet=complet)
+            menu.popup(QtCore.QPoint(10, 10))
+            app.processEvents()
+            menu.grab().save(str(ICI / f"capture_{nom}-{lg}.png"))
+            menu.hide()
         # réglages
         zone.ouvrir_reglages()
         f = zone.fenetre
@@ -53,7 +54,7 @@ def main():
         f.cb_langue.blockSignals(False)
         f._construire()
         f.rafraichir()
-        f.resize(820, 560)
+        f.resize(1000, 720)
         app.processEvents()
         f.grab().save(str(ICI / f"capture_reglages-{lg}.png"))
         f.hide()

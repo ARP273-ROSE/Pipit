@@ -49,7 +49,12 @@ Pipit does the same job, better organised:
 \begin{itemize}
 \item an icon next to the clock: one click shows the list, one click on a line ejects;
 \item a keyboard shortcut that works everywhere (\touche{Win}+\touche{Alt} by default);
-\item when Windows refuses, the name of the program in the way, and a button to close it;
+\item when Windows refuses, the name of the program in the way (and of the files it keeps
+  open), a button to close it, and as a last resort a forced ejection;
+\item a device ejected by mistake comes back without unplugging it;
+\item sticks, memory cards, SSDs, hard drives, phones, tablets, cameras and CD/DVD drives
+  are recognised, each with its icon (or yours);
+\item dark or light theme;
 \item neither the Windows disk nor internal disks are ever offered.
 \end{itemize}
 
@@ -72,20 +77,36 @@ it at hand.}
 
 \section{Removing a device}\label{sec:retirer}
 
-Click Pipit's icon (the green “eject” symbol) or press \touche{Win}+\touche{Alt}. The
-menu opens under the mouse:
+Click Pipit's icon (the green “eject” symbol, with the number of connected devices in red;
+greyed out when there is nothing to remove) or press \touche{Win}+\touche{Alt}. The menu
+opens under the mouse:
 
-\capture[0.62]{../capture_menu-en.png}
+\capture[0.5]{../capture_menu-en.png}
 
-Each line shows the drive letter, its name and its size. \textbf{One click on the line
+Each line shows the icon of the device type, the drive letter, its name and its size. \textbf{One click on the line
 ejects the device.} When it is done, a “Safe to remove” balloon appears: you can pull
 the cable.
 
 \begin{itemize}
 \item \menu{Eject all} removes everything in the list at once.
+\item \menu{More options…} (or a \emph{right} click on the icon) opens the full menu.
+\end{itemize}
+
+\capture[0.5]{../capture_menu_complet-en.png}
+
+\begin{itemize}
+\item \menu{Force ejection}: see section~\ref{sec:forcer}.
+\item \menu{Who is using this device?} lists the programs that have files open on it,
+  before even trying to eject.
 \item \menu{Open in File Explorer} opens a drive's contents.
 \item \menu{Settings…} opens the window described in section~\ref{sec:reglages}.
 \end{itemize}
+
+\subsection{Bringing back a device ejected by mistake}
+A device that was ejected but not yet unplugged appears at the bottom of the menu, under
+“Ejected, still plugged in”. \menu{Bring back …} makes it usable again without touching the
+cable. This also works for a device ejected by Windows or by another program. Windows only
+allows it with administrator rights: see the helper, section~\ref{sec:assistant}.
 
 \section{When Windows refuses}\label{sec:refus}
 
@@ -96,10 +117,16 @@ says who is in the way:
 
 \capture[0.6]{../capture_refus-en.png}
 
+Pipit combines two sources: the Windows log, and the list of files opened by your
+programs, with their paths.
+
 \begin{itemize}
 \item \menu{Close …} politely asks the program to close, exactly like the cross of its
   window: if it has an unsaved document, it will offer to save it. Pipit then tries
   again on its own.
+\item \menu{Search everywhere…} also looks at Windows programs and the antivirus, which
+  your ordinary rights cannot see.
+\item \menu{Force…}: see the next section.
 \item \menu{Try again} retries the ejection once you have closed what was needed.
 \end{itemize}
 
@@ -113,13 +140,27 @@ Special cases:
   from the device.
 \end{itemize}
 
+\section{Forcing an ejection}\label{sec:forcer}
+
+When nothing else works (a program that will not let go, a ghost file),
+\menu{Force ejection} removes the device anyway:
+\begin{enumerate}
+\item everything Windows keeps in memory for this disk is first written to it;
+\item the volume is unmounted, even with open files;
+\item then the device is ejected normally.
+\end{enumerate}
+
+\attention{An \textbf{unsaved} document on this device is lost, and the program that had
+it open may show an error. Pipit reminds you and asks for confirmation every time. This
+requires administrator rights (section~\ref{sec:assistant}).}
+
 \begin{securitebox}
 \begin{itemize}[leftmargin=4mm]
-\item force an ejection: if Windows refuses, nothing is removed;
-\item kill a program (your unsaved documents are protected);
+\item force an ejection without asking you;
+\item kill a program (“Close” asks politely, like the cross);
 \item close File Explorer, the antivirus or a Windows program;
 \item offer the Windows disk;
-\item ask for administrator rights, install a driver or a service.
+\item install a driver or a permanent service.
 \end{itemize}
 \end{securitebox}
 
@@ -141,6 +182,10 @@ the icon stays next to the clock. To really quit: \menu{Quit Pipit} in the menu.
 
 \subsection{Connected devices}
 \begin{itemize}
+\item \textbf{Icon}: click to choose your own image (PNG, ICO, SVG, JPG) or go back to the
+  icon of the type.
+\item \textbf{Type}: guessed by Pipit (stick, memory card, SSD, hard drive, phone, tablet,
+  camera, CD/DVD drive…); correct it if it is wrong.
 \item \textbf{Displayed name}: double-click to give a meaningful name (“Photo backup”
   rather than “SanDisk Extreme Pro USB Device”). Clear the name to go back to the
   hardware one.
@@ -165,9 +210,21 @@ pick another one.
 \item \textbf{Also show hot-plug internal disks}: Windows often presents internal SATA
   disks as “removable”. Pipit hides them so that an internal disk is not ejected by
   mistake; tick only if you have a removable drive bay.
+\item \textbf{Show phones, tablets and cameras}.
+\item \textbf{Number of devices on the icon}.
+\item \textbf{Remind about forgotten devices when signing out}: on shutdown, Pipit offers to
+  eject everything if something is still plugged in.
 \item \textbf{Start Pipit with Windows}.
 \item \textbf{Language}: French, English, or that of Windows.
+\item \textbf{Theme}: dark or light, your choice (Windows does not decide for you).
 \end{itemize}
+
+\subsection{Administrator helper}\label{sec:assistant}
+Bringing a device back, forcing an ejection and searching among Windows programs require
+administrator rights. Without the helper, Windows asks for confirmation (UAC prompt) every
+time. \menu{Install the helper} creates a scheduled task “Pipit\textbackslash Assistant”
+(a single confirmation): after that, nothing is asked again. It only runs for the time of a
+requested action, does only these three things, and can be removed in one click.
 
 \section{Updates and incident reports}
 
@@ -201,13 +258,13 @@ run.py --discret & starts the icon only, without opening the settings \\
 bay, tick “Also show hot-plug internal disks”. If it is hidden, untick \menu{Hide} in the
 settings.
 
-\textbf{Do mice, keyboards or phones show up?} No: Pipit only lists drives (sticks, disks,
-memory cards). Everything else can be unplugged without precaution.
+\textbf{Do mice or keyboards show up?} No: they can be unplugged without precaution. Phones,
+tablets and cameras do (option in the settings).
 
 \textbf{After ejection, the drive keeps spinning.} Depending on the enclosure, power is not
 cut; it is nonetheless properly unmounted. You can unplug it.
 
-\textbf{I want an ejected device back without unplugging it.} Unplug it and plug it back
-in: Windows cannot “re-insert” an ejected device.
+\textbf{I want an ejected device back without unplugging it.} Icon menu →
+\menu{Bring back …}. If Windows still refuses, unplug it and plug it back in.
 
 \end{document}

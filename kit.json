@@ -50,7 +50,10 @@
     "pipit.peripheriques",
     "pipit.disques_windows",
     "pipit.i18n",
-    "interface_kit"
+    "interface_kit",
+    "pipit.assistant",
+    "pipit.poignees",
+    "pipit.admin_windows"
   ],
   "icone_png": "logo_256.png",
   "nom_affiche_fr": "Pipit",

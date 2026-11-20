@@ -70,3 +70,60 @@ def test_lancement_avec_windows_aller_retour():
         assert systeme.lancer_avec_windows(False) and not systeme.lance_avec_windows()
     finally:
         systeme.lancer_avec_windows(avant)
+
+
+# ------------------------------------------------------------ 0.2.0
+def test_types_et_attente_sans_erreur():
+    from pipit import disques_windows, peripheriques
+    for d in disques_windows.lister():
+        print(d.nom, d.bus, d.ssd, d.appareil)
+    assert isinstance(disques_windows.en_attente_de_retrait(), list)
+    for p in peripheriques.lister(internes_a_chaud=True):
+        assert p.type
+
+
+def test_coupable_trouve_par_les_poignees(tmp_path):
+    """Un autre programme garde un fichier ouvert : Pipit doit le trouver, avec le fichier."""
+    import subprocess
+    import time
+    from pipit import poignees
+    fichier = tmp_path / "ouvert.txt"
+    fichier.write_text("x")
+    code = ("import sys,time;f=open(sys.argv[1]);print('pret',flush=True);time.sleep(60)")
+    proc = subprocess.Popen([sys.executable, "-c", code, str(fichier)], stdout=subprocess.PIPE, text=True)
+    try:
+        assert proc.stdout.readline().strip() == "pret"
+        debut = time.time()
+        trouves = poignees.chercher([str(fichier)[0]])
+        print(f"{len(trouves or [])} programme(s) en {time.time() - debut:.1f} s")
+        assert trouves is not None
+        moi = [c for c in trouves if c.pid == proc.pid]
+        assert moi, [(c.programme, c.pid) for c in trouves]
+        assert any(f.lower().endswith("ouvert.txt") for f in moi[0].fichiers)
+    finally:
+        proc.kill()
+
+
+def test_assistant_tache_creee_puis_retiree():
+    """Les machines de GitHub sont administrateur : la vraie tâche planifiée se crée."""
+    from pipit import assistant
+    if not assistant.est_admin():
+        pytest.skip("pas administrateur")
+    try:
+        assert assistant.installer(), "tâche non créée"
+        assert assistant.installe()
+    finally:
+        assistant.desinstaller()
+    assert not assistant.installe()
+
+
+def test_assistant_repond_par_fichier():
+    """Demande « coupables » traitée par le vrai code de l'assistant (sans la tâche)."""
+    import json
+    from pipit import assistant
+    d = assistant.dossier() / "demande-ci.json"
+    d.write_text(json.dumps({"action": "coupables", "id": "USB\\VID_0000&PID_0000\\X", "lettres": ["C"]}),
+                 encoding="utf-8")
+    assert assistant.executer() == 0
+    r = json.loads((assistant.dossier() / "reponse-ci.json").read_text(encoding="utf-8"))
+    assert r["ok"], r

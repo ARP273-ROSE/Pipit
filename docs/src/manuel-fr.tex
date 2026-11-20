@@ -49,7 +49,12 @@ Pipit fait la même chose, en mieux rangé :
 \begin{itemize}
 \item une icône près de l'horloge : un clic montre la liste, un clic sur une ligne éjecte ;
 \item un raccourci clavier, actif partout (\touche{Win}+\touche{Alt} par défaut) ;
-\item quand Windows refuse, le nom du programme en cause, et un bouton pour le fermer ;
+\item quand Windows refuse, le nom du programme en cause (et des fichiers qu'il garde
+  ouverts), un bouton pour le fermer, et en dernier recours l'éjection forcée ;
+\item un périphérique éjecté par erreur revient sans le débrancher ;
+\item clés, cartes mémoire, SSD, disques durs, téléphones, tablettes, appareils photo et
+  lecteurs CD/DVD reconnus, chacun avec son icône (ou la vôtre) ;
+\item thème sombre ou clair ;
 \item ni le disque de Windows, ni les disques internes ne sont jamais proposés.
 \end{itemize}
 
@@ -74,20 +79,37 @@ glisser celle de Pipit dans la barre pour l'avoir toujours sous la main.}
 
 \section{Retirer un périphérique}\label{sec:retirer}
 
-Cliquez sur l'icône de Pipit (le symbole « éjecter » vert) ou appuyez sur
+Cliquez sur l'icône de Pipit (le symbole « éjecter » vert, avec en rouge le nombre de
+périphériques branchés ; grisée quand il n'y a rien à retirer) ou appuyez sur
 \touche{Win}+\touche{Alt}. Le menu s'ouvre sous la souris :
 
-\capture[0.62]{../capture_menu-fr.png}
+\capture[0.5]{../capture_menu-fr.png}
 
-Chaque ligne donne la lettre du lecteur, son nom et sa taille. \textbf{Un clic sur la
+Chaque ligne donne l'icône du type de périphérique, la lettre du lecteur, son nom et sa taille. \textbf{Un clic sur la
 ligne éjecte le périphérique.} Quand c'est fait, une bulle « Vous pouvez débrancher »
 apparaît : vous pouvez retirer le câble.
 
 \begin{itemize}
 \item \menu{Tout éjecter} retire tout ce qui est dans la liste, d'un coup.
+\item \menu{Plus d'options…} (ou un clic \emph{droit} sur l'icône) ouvre le menu complet.
+\end{itemize}
+
+\capture[0.5]{../capture_menu_complet-fr.png}
+
+\begin{itemize}
+\item \menu{Forcer l'éjection} : voir section~\ref{sec:forcer}.
+\item \menu{Qui utilise ce périphérique ?} liste les programmes qui ont des fichiers
+  ouverts dessus, avant même d'essayer d'éjecter.
 \item \menu{Ouvrir dans l'Explorateur} ouvre le contenu d'un lecteur.
 \item \menu{Réglages…} ouvre la fenêtre décrite section~\ref{sec:reglages}.
 \end{itemize}
+
+\subsection{Remonter un périphérique éjecté par erreur}
+Un périphérique éjecté mais pas encore débranché apparaît en bas du menu, sous
+« Éjectés, encore branchés ». \menu{Remonter …} le rend de nouveau utilisable, sans
+toucher au câble. Cela marche aussi pour un périphérique éjecté par Windows ou par un
+autre logiciel. Windows n'accepte ce geste qu'avec les droits d'administrateur : voir
+l'assistant, section~\ref{sec:assistant}.
 
 \section{Quand Windows refuse}\label{sec:refus}
 
@@ -98,10 +120,16 @@ lâche souvent tout seul), puis, s'il échoue encore, dit qui est en cause :
 
 \capture[0.6]{../capture_refus-fr.png}
 
+Pipit croise deux sources : le journal de Windows, et la liste des fichiers ouverts par
+vos programmes, avec leur chemin.
+
 \begin{itemize}
 \item \menu{Fermer …} demande poliment au programme de se fermer, exactement comme la
   croix de sa fenêtre : s'il a un document non enregistré, il vous le proposera. Pipit
   réessaie ensuite tout seul.
+\item \menu{Chercher partout…} regarde aussi les programmes de Windows et l'antivirus,
+  que vos droits ordinaires ne permettent pas de voir.
+\item \menu{Forcer…} : voir la section suivante.
 \item \menu{Réessayer} relance l'éjection, après que vous avez fermé vous-même ce qu'il
   fallait.
 \end{itemize}
@@ -117,13 +145,28 @@ Cas particuliers :
   ouverts depuis le périphérique.
 \end{itemize}
 
+\section{Forcer l'éjection}\label{sec:forcer}
+
+Quand rien n'y fait (un programme qui ne veut pas lâcher prise, un fichier fantôme),
+\menu{Forcer l'éjection} retire quand même le périphérique :
+\begin{enumerate}
+\item tout ce que Windows garde en mémoire pour ce disque y est d'abord écrit ;
+\item le volume est démonté, même avec des fichiers ouverts ;
+\item puis le périphérique est éjecté normalement.
+\end{enumerate}
+
+\attention{Un document \textbf{non enregistré} sur ce périphérique est perdu, et le
+programme qui l'avait ouvert peut afficher une erreur. Pipit le rappelle et demande
+confirmation à chaque fois. Ce geste demande les droits d'administrateur
+(section~\ref{sec:assistant}).}
+
 \begin{securitebox}
 \begin{itemize}[leftmargin=4mm]
-\item forcer une éjection : si Windows refuse, rien n'est retiré ;
-\item fermer de force un programme (vos documents non enregistrés sont protégés) ;
+\item forcer une éjection sans vous le demander ;
+\item fermer de force un programme (« Fermer » demande poliment, comme la croix) ;
 \item fermer l'Explorateur, l'antivirus ou un programme de Windows ;
 \item proposer le disque de Windows ;
-\item demander des droits d'administrateur, installer un pilote ou un service.
+\item installer un pilote ou un service permanent.
 \end{itemize}
 \end{securitebox}
 
@@ -147,6 +190,10 @@ dans le menu.
 
 \subsection{Périphériques branchés}
 \begin{itemize}
+\item \textbf{Icône} : cliquez pour choisir votre propre image (PNG, ICO, SVG, JPG) ou
+  revenir à l'icône du type.
+\item \textbf{Type} : deviné par Pipit (clé, carte mémoire, SSD, disque dur, téléphone,
+  tablette, appareil photo, lecteur CD/DVD…) ; corrigez-le s'il se trompe.
 \item \textbf{Nom affiché} : double-cliquez pour donner un nom parlant
   (« Sauvegarde photo » plutôt que « SanDisk Extreme Pro USB Device »). Effacez le nom
   pour revenir à celui du matériel.
@@ -172,9 +219,22 @@ choisissez-en un autre.
   souvent les disques SATA internes comme « amovibles ». Pipit les cache pour éviter
   d'éjecter un disque interne par erreur ; cochez seulement si vous avez un tiroir
   ou une baie extractible.
+\item \textbf{Montrer téléphones, tablettes et appareils photo}.
+\item \textbf{Nombre de périphériques sur l'icône}.
+\item \textbf{Rappeler les périphériques oubliés à la fermeture de session} : à l'arrêt du
+  PC, Pipit propose de tout éjecter s'il reste quelque chose de branché.
 \item \textbf{Lancer Pipit au démarrage de Windows}.
 \item \textbf{Langue} : français, anglais, ou celle de Windows.
+\item \textbf{Thème} : sombre ou clair, au choix (Windows ne décide pas à votre place).
 \end{itemize}
+
+\subsection{Assistant administrateur}\label{sec:assistant}
+Remonter un périphérique, forcer une éjection et chercher les coupables parmi les
+programmes de Windows demandent les droits d'administrateur. Sans assistant, Windows
+demande confirmation (fenêtre UAC) à chaque fois. \menu{Installer l'assistant} crée une
+tâche planifiée « Pipit\textbackslash Assistant » (une seule confirmation) : ensuite, plus
+rien n'est redemandé. Elle ne tourne que le temps d'un geste demandé, ne fait que ces trois
+choses, et se retire d'un clic.
 
 \section{Mises à jour et rapports d'incident}
 
@@ -208,13 +268,13 @@ run.py --discret & lance l'icône seule, sans ouvrir les réglages \\
 SATA, cochez « Montrer aussi les disques internes branchés à chaud ». S'il est masqué,
 décochez \menu{Masquer} dans les réglages.
 
-\textbf{Une souris, un clavier, un téléphone apparaissent-ils ?} Non : Pipit ne liste que
-les disques (clés, disques, cartes mémoire). Le reste se débranche sans précaution.
+\textbf{Une souris, un clavier apparaissent-ils ?} Non : ils se débranchent sans précaution.
+Téléphones, tablettes et appareils photo, oui (option dans les réglages).
 
 \textbf{Après l'éjection, le disque continue de tourner.} Selon le boîtier, l'alimentation
 n'est pas coupée ; il est pourtant bien démonté. Vous pouvez débrancher.
 
-\textbf{Je veux revoir un périphérique éjecté sans le débrancher.} Débranchez-le puis
-rebranchez-le : Windows ne sait pas « réinsérer » un périphérique éjecté.
+\textbf{Je veux revoir un périphérique éjecté sans le débrancher.} Menu de l'icône →
+\menu{Remonter …}. Si Windows refuse quand même, débranchez-le puis rebranchez-le.
 
 \end{document}

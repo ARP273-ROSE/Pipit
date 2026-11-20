@@ -17,6 +17,12 @@ class Reglages:
     demander_lecteur_cartes: bool = True
     internes_a_chaud: bool = False
     demarrage_propose: bool = False
+    theme: str = "sombre"                 # « clair » ou « sombre » ; jamais le thème de Windows
+    icones: dict[str, str] = field(default_factory=dict)   # matériel → image choisie (dossier des données)
+    types: dict[str, str] = field(default_factory=dict)    # matériel → type corrigé à la main
+    appareils: bool = True                # téléphones, tablettes, appareils photo
+    compteur: bool = True                 # nombre de périphériques sur l'icône
+    rappel_fermeture: bool = False        # prévenir à la fermeture de session s'il reste des périphériques
 
 
 def _fichier():

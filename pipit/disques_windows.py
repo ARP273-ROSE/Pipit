@@ -38,7 +38,7 @@ FILE_DEVICE_DISK = 7
 CM_DRP_DEVICEDESC, CM_DRP_FRIENDLYNAME, CM_DRP_CAPABILITIES = 0x1, 0xD, 0x10
 CM_DEVCAP_REMOVABLE = 0x4
 CR_SUCCESS, CR_REMOVE_VETOED = 0, 0x17
-DRIVE_REMOVABLE, DRIVE_FIXED = 2, 3
+DRIVE_REMOVABLE, DRIVE_FIXED, DRIVE_CDROM = 2, 3, 5
 
 # STORAGE_BUS_TYPE
 BUS = {1: "SCSI", 2: "ATAPI", 3: "ATA", 4: "1394", 6: "Fibre", 7: "USB", 8: "RAID",
@@ -59,6 +59,12 @@ def _guid(texte: str) -> GUID:
 
 
 GUID_DEVINTERFACE_DISK = _guid("53f56307-b6bf-11d0-94f2-00a0c91efb8b")
+GUID_DEVINTERFACE_CDROM = _guid("53f56308-b6bf-11d0-94f2-00a0c91efb8b")
+# classes d'appareils qui ne sont pas des disques mais se débranchent : téléphones,
+# tablettes, baladeurs (WPD / MTP) et appareils photo (Image / PTP)
+GUID_CLASSE_WPD = _guid("eec5ad98-8080-425f-922a-dabf3de3f69a")
+GUID_CLASSE_IMAGE = _guid("6bdd1fc6-810f-11d0-bec7-08002be2092f")
+FILE_DEVICE_CD_ROM = 2
 
 
 class SP_DEVICE_INTERFACE_DATA(ctypes.Structure):
@@ -72,7 +78,7 @@ class SP_DEVINFO_DATA(ctypes.Structure):
 
 
 setupapi.SetupDiGetClassDevsW.restype = wintypes.HANDLE
-setupapi.SetupDiGetClassDevsW.argtypes = [ctypes.POINTER(GUID), wintypes.LPCWSTR, wintypes.HWND, wintypes.DWORD]
+setupapi.SetupDiGetClassDevsW.argtypes = [ctypes.c_void_p, wintypes.LPCWSTR, wintypes.HWND, wintypes.DWORD]
 setupapi.SetupDiEnumDeviceInterfaces.restype = wintypes.BOOL
 setupapi.SetupDiEnumDeviceInterfaces.argtypes = [wintypes.HANDLE, ctypes.c_void_p, ctypes.POINTER(GUID),
                                                  wintypes.DWORD, ctypes.POINTER(SP_DEVICE_INTERFACE_DATA)]
@@ -81,6 +87,8 @@ setupapi.SetupDiGetDeviceInterfaceDetailW.argtypes = [
     wintypes.HANDLE, ctypes.POINTER(SP_DEVICE_INTERFACE_DATA), ctypes.c_void_p, wintypes.DWORD,
     ctypes.POINTER(wintypes.DWORD), ctypes.POINTER(SP_DEVINFO_DATA)]
 setupapi.SetupDiDestroyDeviceInfoList.argtypes = [wintypes.HANDLE]
+setupapi.SetupDiEnumDeviceInfo.restype = wintypes.BOOL
+setupapi.SetupDiEnumDeviceInfo.argtypes = [wintypes.HANDLE, wintypes.DWORD, ctypes.POINTER(SP_DEVINFO_DATA)]
 
 kernel32.CreateFileW.restype = wintypes.HANDLE
 kernel32.CreateFileW.argtypes = [wintypes.LPCWSTR, wintypes.DWORD, wintypes.DWORD, ctypes.c_void_p,
@@ -152,6 +160,15 @@ def _description(h) -> dict:
             "fabricant": _chaine(r, o_fab), "modele": _chaine(r, o_mod), "serie": _chaine(r, o_serie)}
 
 
+def _ssd(h) -> bool | None:
+    """StorageDeviceSeekPenaltyProperty : pas de pénalité de recherche = SSD. Beaucoup de
+    boîtiers USB ne répondent pas : None."""
+    r = _ioctl(h, IOCTL_STORAGE_QUERY_PROPERTY, struct.pack("<II4x", 7, 0), 64)
+    if not r or len(r) < 9:
+        return None
+    return not bool(r[8])
+
+
 def _taille(h) -> int:
     r = _ioctl(h, IOCTL_DISK_GET_DRIVE_GEOMETRY_EX, taille_sortie=256)
     if not r or len(r) < 32:
@@ -198,9 +215,9 @@ def _ancetre_amovible(devinst: int) -> int | None:
     return None
 
 
-def _disques_physiques():
-    """[(numéro de disque, DevInst, chemin d'interface)] des disques présents."""
-    hdev = setupapi.SetupDiGetClassDevsW(ctypes.byref(GUID_DEVINTERFACE_DISK), None, None,
+def _disques_physiques(guid=GUID_DEVINTERFACE_DISK):
+    """[(numéro, DevInst, description, taille, ssd)] des disques (ou lecteurs optiques) présents."""
+    hdev = setupapi.SetupDiGetClassDevsW(ctypes.byref(guid), None, None,
                                          DIGCF_PRESENT | DIGCF_DEVICEINTERFACE)
     if hdev in (None, INVALID_HANDLE):
         return []
@@ -210,7 +227,7 @@ def _disques_physiques():
         while True:
             itf = SP_DEVICE_INTERFACE_DATA()
             itf.cbSize = ctypes.sizeof(itf)
-            if not setupapi.SetupDiEnumDeviceInterfaces(hdev, None, ctypes.byref(GUID_DEVINTERFACE_DISK),
+            if not setupapi.SetupDiEnumDeviceInterfaces(hdev, None, ctypes.byref(guid),
                                                         i, ctypes.byref(itf)):
                 break
             i += 1
@@ -235,17 +252,18 @@ def _disques_physiques():
                 num = _numero(h)
                 desc = _description(h)
                 taille = _taille(h)
+                ssd = _ssd(h)
             finally:
                 kernel32.CloseHandle(h)
             if num:
-                trouves.append((num[1], info.DevInst, desc, taille))
+                trouves.append((num[1], info.DevInst, desc, taille, ssd))
     finally:
         setupapi.SetupDiDestroyDeviceInfoList(hdev)
     return trouves
 
 
-def _lettres_par_disque() -> dict[int, list[tuple[str, str]]]:
-    """{numéro de disque: [(lettre, nom du volume)]}."""
+def _lettres_par_disque() -> dict[tuple[int, int], list[tuple[str, str]]]:
+    """{(type, numéro de disque): [(lettre, nom du volume)]} ; type 7 = disque, 2 = CD/DVD."""
     ancien = kernel32.SetErrorMode(0x1 | 0x8000)     # pas de boîte « insérez un disque »
     resultat: dict[int, list[tuple[str, str]]] = {}
     try:
@@ -254,7 +272,7 @@ def _lettres_par_disque() -> dict[int, list[tuple[str, str]]]:
             if not masque & (1 << i):
                 continue
             racine = f"{lettre}:\\"
-            if kernel32.GetDriveTypeW(racine) not in (DRIVE_REMOVABLE, DRIVE_FIXED):
+            if kernel32.GetDriveTypeW(racine) not in (DRIVE_REMOVABLE, DRIVE_FIXED, DRIVE_CDROM):
                 continue
             h = _ouvrir(f"\\\\.\\{lettre}:")
             if not h:
@@ -263,12 +281,12 @@ def _lettres_par_disque() -> dict[int, list[tuple[str, str]]]:
                 num = _numero(h)
             finally:
                 kernel32.CloseHandle(h)
-            if not num or num[0] != FILE_DEVICE_DISK:
+            if not num or num[0] not in (FILE_DEVICE_DISK, FILE_DEVICE_CD_ROM):
                 continue
             nom = ctypes.create_unicode_buffer(261)
             if not kernel32.GetVolumeInformationW(racine, nom, 261, None, None, None, None, 0):
                 nom.value = ""
-            resultat.setdefault(num[1], []).append((lettre, nom.value))
+            resultat.setdefault((num[0], num[1]), []).append((lettre, nom.value))
     finally:
         kernel32.SetErrorMode(ancien)
     return resultat
@@ -282,29 +300,73 @@ def _lettre_systeme() -> str:
 
 # ------------------------------------------------------------------ interface publique
 from .modele import nettoyer_nom  # noqa: E402
+def _nom(devinst: int, desc: dict, defaut: str) -> str:
+    return nettoyer_nom(str(_propriete(devinst, CM_DRP_FRIENDLYNAME) or _propriete(devinst, CM_DRP_DEVICEDESC)
+                            or " ".join(x for x in (desc.get("fabricant"), desc.get("modele")) if x) or defaut))
+
+
+def _appareils(guid, genre: str) -> list[Disque]:
+    """Appareils d'une classe (téléphones, appareils photo) : présents, avec un ancêtre amovible."""
+    hdev = setupapi.SetupDiGetClassDevsW(ctypes.byref(guid), None, None, DIGCF_PRESENT)
+    if hdev in (None, INVALID_HANDLE):
+        return []
+    trouves = []
+    try:
+        i = 0
+        while True:
+            info = SP_DEVINFO_DATA()
+            info.cbSize = ctypes.sizeof(info)
+            if not setupapi.SetupDiEnumDeviceInfo(hdev, i, ctypes.byref(info)):
+                break
+            i += 1
+            ancetre = _ancetre_amovible(info.DevInst)
+            if ancetre is None:
+                continue
+            ident = _id(info.DevInst)
+            bus = "USB" if ident.upper().startswith(("USB", "SWD\\WPDBUSENUM\\_??_USB")) or \
+                "USB" in _id(ancetre).upper() else "?"
+            p = _parent(ancetre)
+            trouves.append(Disque(-1, _nom(info.DevInst, {}, genre), bus, id_disque=ident,
+                                  id_ejectable=_id(ancetre), id_parent=_id(p) if p is not None else "",
+                                  appareil=genre))
+    finally:
+        setupapi.SetupDiDestroyDeviceInfoList(hdev)
+    return trouves
+
+
 def lister() -> list[Disque]:
-    """Tous les disques présents, internes compris (le tri se fait dans peripheriques.py)."""
+    """Tous les disques présents, internes compris (le tri se fait dans peripheriques.py),
+    plus les lecteurs CD/DVD, téléphones, tablettes et appareils photo."""
     lettres = _lettres_par_disque()
     systeme = _lettre_systeme()
     disques = []
-    for numero, devinst, desc, taille in _disques_physiques():
-        ancetre = _ancetre_amovible(devinst)
-        vols = lettres.get(numero, [])
-        nom = (_propriete(devinst, CM_DRP_FRIENDLYNAME) or _propriete(devinst, CM_DRP_DEVICEDESC)
-               or " ".join(x for x in (desc.get("fabricant"), desc.get("modele")) if x) or f"Disque {numero}")
-        disques.append(Disque(
-            numero=numero,
-            nom=nettoyer_nom(str(nom)),
-            bus=desc.get("bus", "?"),
-            taille=taille,
-            lettres=[l for l, _ in vols],
-            volumes=[v for _, v in vols],
-            id_disque=_id(devinst),
-            id_ejectable=_id(ancetre) if ancetre is not None else "",
-            id_parent=_id(_parent(ancetre)) if ancetre is not None and _parent(ancetre) is not None else "",
-            support_amovible=desc.get("support_amovible", False),
-            systeme=systeme in [l for l, _ in vols],
-        ))
+    for guid, type_num, appareil in ((GUID_DEVINTERFACE_DISK, FILE_DEVICE_DISK, ""),
+                                     (GUID_DEVINTERFACE_CDROM, FILE_DEVICE_CD_ROM, "optique")):
+        for numero, devinst, desc, taille, ssd in _disques_physiques(guid):
+            ancetre = _ancetre_amovible(devinst)
+            vols = lettres.get((type_num, numero), [])
+            parent = _parent(ancetre) if ancetre is not None else None
+            disques.append(Disque(
+                numero=numero if not appareil else 1000 + numero,
+                nom=_nom(devinst, desc, f"Disque {numero}"),
+                bus=desc.get("bus", "?"),
+                taille=taille,
+                lettres=[l for l, _ in vols],
+                volumes=[v for _, v in vols],
+                id_disque=_id(devinst),
+                id_ejectable=_id(ancetre) if ancetre is not None else "",
+                id_parent=_id(parent) if parent is not None else "",
+                support_amovible=desc.get("support_amovible", False),
+                systeme=systeme in [l for l, _ in vols],
+                ssd=ssd,
+                appareil=appareil,
+            ))
+    vus = {d.id_ejectable for d in disques if d.id_ejectable}
+    for guid, genre in ((GUID_CLASSE_WPD, "telephone"), (GUID_CLASSE_IMAGE, "photo")):
+        for a in _appareils(guid, genre):
+            if a.id_ejectable not in vus:       # un téléphone vu en WPD ET en Image : une seule ligne
+                vus.add(a.id_ejectable)
+                disques.append(a)
     return disques
 
 
@@ -319,3 +381,36 @@ def ejecter(id_ejectable: str) -> tuple[int, str]:
     if r == CR_SUCCESS and veto.value == 0:
         return 0, ""
     return (veto.value or -r), nom.value
+
+
+# ------------------------------------------------------------------ éjectés mais encore branchés
+DIGCF_ALLCLASSES = 0x4
+DN_HAS_PROBLEM = 0x400
+CM_PROB_HELD_FOR_EJECT = 47
+cfgmgr32.CM_Get_DevNode_Status.argtypes = [ctypes.POINTER(wintypes.ULONG), ctypes.POINTER(wintypes.ULONG),
+                                           wintypes.DWORD, wintypes.ULONG]
+
+
+def en_attente_de_retrait() -> list[tuple[str, str]]:
+    """[(identifiant, nom)] des périphériques éjectés mais pas débranchés (problème 47),
+    qu'ils aient été éjectés par Pipit, par Windows ou par un autre outil."""
+    hdev = setupapi.SetupDiGetClassDevsW(None, None, None, DIGCF_PRESENT | DIGCF_ALLCLASSES)
+    if hdev in (None, INVALID_HANDLE):
+        return []
+    trouves = []
+    try:
+        i = 0
+        while True:
+            info = SP_DEVINFO_DATA()
+            info.cbSize = ctypes.sizeof(info)
+            if not setupapi.SetupDiEnumDeviceInfo(hdev, i, ctypes.byref(info)):
+                break
+            i += 1
+            st, pb = wintypes.ULONG(), wintypes.ULONG()
+            if cfgmgr32.CM_Get_DevNode_Status(ctypes.byref(st), ctypes.byref(pb), info.DevInst, 0) != CR_SUCCESS:
+                continue
+            if st.value & DN_HAS_PROBLEM and pb.value == CM_PROB_HELD_FOR_EJECT:
+                trouves.append((_id(info.DevInst), _nom(info.DevInst, {}, "?")))
+    finally:
+        setupapi.SetupDiDestroyDeviceInfoList(hdev)
+    return trouves

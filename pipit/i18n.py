@@ -226,4 +226,83 @@ TEXTES: dict[str, dict[str, str]] = {
     "signal.parti": _t("Merci, le signalement est parti.", "Thank you, the report was sent."),
     "signal.local": _t("Pas de réseau : le signalement a été enregistré ici :\n{chemin}",
                        "No network: the report was saved here:\n{chemin}"),
+    # ---- 0.2.0 : types de périphériques
+    "type.auto": _t("Automatique ({type})", "Automatic ({type})"),
+    "type.cle": _t("Clé USB", "USB stick"),
+    "type.carte": _t("Carte mémoire", "Memory card"),
+    "type.ssd": _t("SSD externe", "External SSD"),
+    "type.hdd": _t("Disque dur externe", "External hard drive"),
+    "type.interne": _t("Disque interne", "Internal disk"),
+    "type.optique": _t("Lecteur CD/DVD", "CD/DVD drive"),
+    "type.telephone": _t("Téléphone", "Phone"),
+    "type.tablette": _t("Tablette", "Tablet"),
+    "type.photo": _t("Appareil photo", "Camera"),
+    "type.autre": _t("Autre", "Other"),
+    "col.icone": _t("Icône", "Icon"),
+    "col.type": _t("Type", "Type"),
+    "icone.aide": _t("Changer l'icône de ce périphérique", "Change this device's icon"),
+    "icone.choisir": _t("Choisir une image…", "Choose an image…"),
+    "icone.defaut": _t("Icône du type", "Icon of the type"),
+    "icone.filtre": _t("Images", "Images"),
+    "icone.illisible": _t("Cette image n'a pas pu être lue.", "This image could not be read."),
+    # ---- menus
+    "zone.plus": _t("Plus d'options…", "More options…"),
+    "zone.forcer": _t("Forcer l'éjection", "Force ejection"),
+    "zone.coupables": _t("Qui utilise ce périphérique ?", "Who is using this device?"),
+    "zone.remonter_titre": _t("Éjectés, encore branchés :", "Ejected, still plugged in:"),
+    "zone.remonter": _t("Remonter « {nom} »", "Bring back “{nom}”"),
+    # ---- refus, forçage, coupables
+    "refus.autres": _t("… et {n} autre(s)", "… and {n} more"),
+    "refus.chercher_partout": _t("Chercher partout…", "Search everywhere…"),
+    "refus.forcer": _t("Forcer…", "Force…"),
+    "forcer.question": _t("Forcer l'éjection de « {nom} » ?", "Force the ejection of “{nom}”?"),
+    "forcer.texte": _t("Les caches sont d'abord vidés sur le disque, puis le volume est démonté même si des "
+                       "fichiers sont encore ouverts : un document NON ENREGISTRÉ sur ce périphérique sera "
+                       "perdu, et le programme qui l'avait ouvert peut afficher une erreur. Demande les droits "
+                       "d'administrateur.",
+                       "Caches are first written to the disk, then the volume is unmounted even if files are "
+                       "still open: an UNSAVED document on this device will be lost, and the program that had "
+                       "it open may show an error. Requires administrator rights."),
+    "forcer.oui": _t("Forcer l'éjection", "Force ejection"),
+    "forcer.echec": _t("L'éjection forcée a échoué ({detail}).", "The forced ejection failed ({detail})."),
+    "remonte.titre": _t("Périphérique revenu", "Device is back"),
+    "remonte.texte": _t("« {nom} » est de nouveau utilisable.", "“{nom}” can be used again."),
+    "remonte.echec": _t("Windows n'a pas voulu remonter ce périphérique : débranchez-le puis rebranchez-le.",
+                        "Windows would not bring this device back: unplug it and plug it in again."),
+    "admin.uac_refuse": _t("Il faut accepter la demande de Windows (droits d'administrateur) pour ce geste.",
+                           "You need to accept the Windows prompt (administrator rights) for this."),
+    "coupables.titre": _t("Programmes qui utilisent « {nom} »", "Programs using “{nom}”"),
+    "coupables.inconnu": _t("La recherche n'a pas abouti.", "The search did not complete."),
+    "coupables.aucun": _t("Aucun de vos programmes n'a de fichier ouvert dessus. « Chercher partout » regarde "
+                          "aussi les programmes de Windows et l'antivirus (droits d'administrateur).",
+                          "None of your programs has a file open on it. “Search everywhere” also looks at "
+                          "Windows programs and the antivirus (administrator rights)."),
+    "coupables.aucun_partout": _t("Aucun programme n'a de fichier ouvert dessus.",
+                                  "No program has a file open on it."),
+    "coupables.ejecter": _t("Éjecter", "Eject"),
+    # ---- fin de session
+    "oubli.titre": _t("Des périphériques sont encore branchés :", "Some devices are still plugged in:"),
+    "oubli.ejecter": _t("Tout éjecter", "Eject all"),
+    "oubli.continuer": _t("Continuer sans éjecter", "Continue without ejecting"),
+    # ---- réglages
+    "fen.assistant": _t("Assistant administrateur", "Administrator helper"),
+    "assistant.present": _t("Installé : remonter, forcer et chercher partout se font sans redemander.",
+                            "Installed: bringing back, forcing and searching everywhere happen without asking again."),
+    "assistant.absent": _t("Non installé : Windows demandera une confirmation (UAC) à chaque remontage, éjection "
+                           "forcée ou recherche complète. L'installer = une seule confirmation.",
+                           "Not installed: Windows will ask for confirmation (UAC) for each bring-back, forced "
+                           "ejection or full search. Installing it = a single confirmation."),
+    "assistant.installer": _t("Installer l'assistant", "Install the helper"),
+    "assistant.retirer": _t("Retirer l'assistant", "Remove the helper"),
+    "opt.appareils": _t("Montrer téléphones, tablettes et appareils photo", "Show phones, tablets and cameras"),
+    "opt.compteur": _t("Nombre de périphériques sur l'icône", "Number of devices on the icon"),
+    "opt.rappel": _t("Rappeler les périphériques oubliés à la fermeture de session",
+                     "Remind about forgotten devices when signing out"),
+    "opt.rappel.aide": _t("À l'arrêt ou à la fermeture de session, Pipit propose de tout éjecter s'il reste "
+                          "quelque chose de branché.",
+                          "On shutdown or sign-out, Pipit offers to eject everything if something is still "
+                          "plugged in."),
+    "opt.theme": _t("Thème", "Theme"),
+    "theme.sombre": _t("Sombre", "Dark"),
+    "theme.clair": _t("Clair", "Light"),
 }

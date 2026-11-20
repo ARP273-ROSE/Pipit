@@ -5,6 +5,7 @@
     python run.py --discret    icône seule (lancement avec Windows)
     python run.py --lister     liste les périphériques retirables, sans rien éjecter
     python run.py --ejecter E  éjecte le périphérique qui porte la lettre E:
+    python run.py --assistant  (interne) gestes administrateur demandés par l'icône
 
 Branchement du kit commun : rapports d'incident (plantage Python, crash
 natif, gel), accord au premier lancement, verrou nommé lu par l'installeur,
@@ -157,8 +158,11 @@ def _lister(tout: bool) -> int:
     r = reglages.charger()
     for p in peripheriques.lister(set(r.masques), r.internes_a_chaud, avec_masques=True):
         masque = " [masqué]" if p.materiel in {m.upper() for m in r.masques} else ""
-        print(f"{','.join(l + ':' for l in p.lettres) or '-'}\t{p.nom}\t{p.bus}\t"
+        print(f"{','.join(l + ':' for l in p.lettres) or '-'}\t{p.nom}\t{p.type}\t{p.bus}\t"
               f"{taille_lisible(p.taille, langue())}\t{p.id}{masque}")
+    if tout:
+        for ident, nom in peripheriques.en_attente_de_retrait():
+            print(f"[éjecté, encore branché] {nom}\t{ident}")
     return 0
 
 
@@ -185,6 +189,11 @@ def _ejecter(lettre: str) -> int:
 def main() -> int:
     if "--check" in sys.argv[1:]:
         return _verifier()
+    if "--assistant" in sys.argv[1:]:
+        # assistant administrateur (tâche planifiée ou fenêtre UAC) : traite les demandes, puis s'arrête
+        from pipit import assistant
+        suite = sys.argv[sys.argv.index("--assistant") + 1:]
+        return assistant.executer(suite[0] if suite else None)
     from pipit.i18n import definir_langue, tr
     ap = argparse.ArgumentParser(description=tr("cli.description"))
     ap.add_argument("--discret", action="store_true", help="tray icon only / icône seule")
@@ -225,8 +234,8 @@ def main() -> int:
     app.setApplicationName(NOM)
     app.setQuitOnLastWindowClosed(False)                       # l'icône vit sans fenêtre
     app._mutex_installeur = mutex
-    from pipit import style
-    style.appliquer(app)
+    from pipit import reglages, style
+    style.appliquer(app, reglages.charger().theme)
     icone = Path(__file__).resolve().parent / "logo.png"
     if icone.exists():
         app.setWindowIcon(QtGui.QIcon(str(icone)))
@@ -236,6 +245,7 @@ def main() -> int:
 
     from pipit.zone import Zone
     zone = Zone(app)
+    app.commitDataRequest.connect(zone.fin_de_session)
     premier = not zone.reglages.demarrage_propose
     QtCore.QTimer.singleShot(800, lambda: _premier_lancement(zone))
     if premier or not args.discret:

@@ -35,18 +35,21 @@ def tous_les_disques() -> list[Disque]:
     return _moteur().lister()
 
 
-def visible(p: Peripherique, internes_a_chaud: bool = False) -> bool:
+def visible(p: Peripherique, internes_a_chaud: bool = False, appareils: bool = True) -> bool:
     """Externe (USB, carte SD…), jamais le disque de Windows. Les disques SATA branchés
-    à chaud passent pour « amovibles » aux yeux de Windows : cachés sauf demande."""
+    à chaud passent pour « amovibles » aux yeux de Windows : cachés sauf demande.
+    Téléphones, tablettes, appareils photo : montrés sauf demande."""
     if any(d.systeme for d in p.disques):
         return False
+    if any(d.appareil and d.appareil != "optique" for d in p.disques):
+        return appareils
     return internes_a_chaud or p.bus in BUS_EXTERNES
 
 
 def lister(masques: set[str] | None = None, internes_a_chaud: bool = False,
-           avec_masques: bool = False) -> list[Peripherique]:
+           avec_masques: bool = False, appareils: bool = True) -> list[Peripherique]:
     masques = {m.upper() for m in (masques or set())}
-    perifs = [p for p in regrouper(tous_les_disques()) if visible(p, internes_a_chaud)]
+    perifs = [p for p in regrouper(tous_les_disques()) if visible(p, internes_a_chaud, appareils)]
     if not avec_masques:
         perifs = [p for p in perifs if p.materiel not in masques]
     return perifs
@@ -76,5 +79,44 @@ def ejecter(p: Peripherique, essais: int = 2) -> Resultat:
             return Resultat(True, veto)
         if i + 1 < essais:
             time.sleep(1.0)
-    from . import bloqueurs
-    return Resultat(False, veto, nom, bloqueurs.chercher(depuis=debut - 2, lettres=p.lettres))
+    from . import bloqueurs, poignees
+    trouves = bloqueurs.chercher(depuis=debut - 2, lettres=p.lettres)
+    # le journal de Windows ne note pas tout : on regarde aussi les fichiers ouverts
+    # par les programmes de l'utilisateur (sans droits d'administrateur)
+    connus = {b.pid for b in trouves}
+    for c in poignees.chercher(p.lettres) or []:
+        if c.pid not in connus:
+            trouves.append(bloqueurs.Bloqueur(c.pid, c.programme, c.chemin_programme, c.fichiers))
+    return Resultat(False, veto, nom, trouves)
+
+
+# ------------------------------------------------------------------ éjectés, encore branchés
+def en_attente_de_retrait() -> list[tuple[str, str]]:
+    """[(identifiant, nom)] : éjectés mais pas débranchés, donc remontables."""
+    try:
+        return _moteur().en_attente_de_retrait()
+    except Exception:                                   # noqa: BLE001
+        return []
+
+
+def remonter(ident: str) -> dict:
+    from . import assistant
+    return assistant.demander("remonter", ident)
+
+
+def forcer(p: Peripherique) -> dict:
+    from . import assistant
+    return assistant.demander("forcer", p.id, p.lettres)
+
+
+def coupables(p: Peripherique, partout: bool = False) -> list | None:
+    """Programmes qui ont des fichiers ouverts sur le périphérique. Sans `partout`, seulement
+    ceux de l'utilisateur (sans droits) ; avec, par l'assistant administrateur (tous)."""
+    from . import poignees
+    if not partout:
+        return poignees.chercher(p.lettres)
+    from . import assistant
+    r = assistant.demander("coupables", p.id, p.lettres)
+    if not r.get("ok"):
+        return None
+    return [poignees.Coupable(**c) for c in r.get("coupables", [])]

@@ -12,7 +12,7 @@ import json
 import os
 import subprocess
 import sys
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 # Programmes qu'on ne propose jamais de fermer : le système, l'Explorateur (le bureau
 # entier disparaîtrait), les antivirus et l'indexation, qui lâchent prise d'eux-mêmes.
@@ -43,6 +43,7 @@ class Bloqueur:
     pid: int
     programme: str        # nom du fichier, ex. « WINWORD.EXE »
     chemin: str = ""
+    fichiers: list = field(default_factory=list)   # fichiers ouverts sur le périphérique, s'ils sont connus
 
     @property
     def fermable(self) -> bool:

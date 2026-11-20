@@ -8,9 +8,10 @@ from PyQt6 import QtCore, QtGui, QtWidgets
 from . import __version__, reglages, systeme
 from .i18n import definir_langue, langue, tr
 from .modele import taille_lisible
+from .modele import TYPES
 from .raccourci import CHOIX_MENU, CHOIX_TOUT
 
-COL_LETTRES, COL_NOM, COL_MATERIEL, COL_TAILLE, COL_BUS, COL_MASQUE = range(6)
+COL_LETTRES, COL_ICONE, COL_NOM, COL_TYPE, COL_MATERIEL, COL_TAILLE, COL_BUS, COL_MASQUE = range(8)
 
 
 class FenetreReglages(QtWidgets.QWidget):
@@ -21,7 +22,7 @@ class FenetreReglages(QtWidgets.QWidget):
         self.zone = zone
         self.qsettings = QtCore.QSettings("ARP273-ROSE", systeme.NOM)
         self.setWindowIcon(zone.icone)
-        self.resize(820, 600)
+        self.resize(1000, 720)
         self._maj_signal.connect(self._resultat_maj)
         self._contenu = None
         QtWidgets.QVBoxLayout(self).setContentsMargins(0, 0, 0, 0)
@@ -55,11 +56,11 @@ class FenetreReglages(QtWidgets.QWidget):
         # --- périphériques
         g = QtWidgets.QGroupBox(tr("fen.peripheriques"))
         gl = QtWidgets.QVBoxLayout(g)
-        self.table = QtWidgets.QTableWidget(0, 6)
-        self.table.setHorizontalHeaderLabels([tr("col.lettres"), tr("col.nom"), tr("col.materiel"),
-                                              tr("col.taille"), tr("col.bus"), tr("col.masquer")])
+        self.table = QtWidgets.QTableWidget(0, 8)
+        self.table.setHorizontalHeaderLabels([tr("col.lettres"), tr("col.icone"), tr("col.nom"), tr("col.type"),
+                                              tr("col.materiel"), tr("col.taille"), tr("col.bus"),
+                                              tr("col.masquer")])
         self.table.verticalHeader().setVisible(False)
-        self.table.horizontalHeader().setSectionResizeMode(COL_NOM, QtWidgets.QHeaderView.ResizeMode.Stretch)
         self.table.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectionBehavior.SelectRows)
         self.table.itemChanged.connect(self._modif_table)
         gl.addWidget(self.table)
@@ -82,7 +83,20 @@ class FenetreReglages(QtWidgets.QWidget):
         fl.addRow(self.etat_raccourcis)
         self.cb_menu.currentIndexChanged.connect(self._modif_raccourcis)
         self.cb_tout.currentIndexChanged.connect(self._modif_raccourcis)
-        bas.addWidget(gr, 1)
+        gauche = QtWidgets.QVBoxLayout()
+        gauche.addWidget(gr)
+        ga = QtWidgets.QGroupBox(tr("fen.assistant"))
+        al = QtWidgets.QVBoxLayout(ga)
+        self.etat_assistant = QtWidgets.QLabel("")
+        self.etat_assistant.setWordWrap(True)
+        al.addWidget(self.etat_assistant)
+        self.b_assistant = QtWidgets.QPushButton("")
+        self.b_assistant.clicked.connect(self._basculer_assistant)
+        al.addWidget(self.b_assistant)
+        gauche.addWidget(ga)
+        gauche.addStretch(1)
+        bas.addLayout(gauche, 1)
+        self._etat_assistant()
 
         go = QtWidgets.QGroupBox(tr("fen.options"))
         ol = QtWidgets.QVBoxLayout(go)
@@ -91,6 +105,10 @@ class FenetreReglages(QtWidgets.QWidget):
                                     "demander_lecteur_cartes")
         self.c_internes = self._case(ol, tr("opt.internes"), self.r.internes_a_chaud, "internes_a_chaud")
         self.c_internes.setToolTip(tr("opt.internes.aide"))
+        self.c_appareils = self._case(ol, tr("opt.appareils"), self.r.appareils, "appareils")
+        self.c_compteur = self._case(ol, tr("opt.compteur"), self.r.compteur, "compteur")
+        self.c_rappel = self._case(ol, tr("opt.rappel"), self.r.rappel_fermeture, "rappel_fermeture")
+        self.c_rappel.setToolTip(tr("opt.rappel.aide"))
         self.c_demarrage = QtWidgets.QCheckBox(tr("opt.demarrage"))
         self.c_demarrage.setChecked(systeme.lance_avec_windows())
         self.c_demarrage.setEnabled(systeme.WINDOWS)
@@ -113,6 +131,15 @@ class FenetreReglages(QtWidgets.QWidget):
             self.qsettings.value("langue", "auto", type=str))))
         self.cb_langue.currentIndexChanged.connect(self._changer_langue)
         ligne.addWidget(self.cb_langue, 1)
+        ol.addLayout(ligne)
+        ligne = QtWidgets.QHBoxLayout()
+        ligne.addWidget(QtWidgets.QLabel(tr("opt.theme")))
+        self.cb_theme = QtWidgets.QComboBox()
+        for code in ("sombre", "clair"):
+            self.cb_theme.addItem(tr(f"theme.{code}"), code)
+        self.cb_theme.setCurrentIndex(max(0, self.cb_theme.findData(self.r.theme)))
+        self.cb_theme.currentIndexChanged.connect(self._changer_theme)
+        ligne.addWidget(self.cb_theme, 1)
         ol.addLayout(ligne)
         bas.addWidget(go, 1)
         lo.addLayout(bas)
@@ -177,9 +204,65 @@ class FenetreReglages(QtWidgets.QWidget):
                                else QtCore.Qt.CheckState.Unchecked)
             case.setData(QtCore.Qt.ItemDataRole.UserRole, p.materiel)
             self.table.setItem(i, COL_MASQUE, case)
+            # icône : bouton avec un petit menu (choisir une image, revenir à l'icône du type)
+            bouton = QtWidgets.QToolButton()
+            bouton.setIcon(self.zone.icone_de(p))
+            bouton.setIconSize(QtCore.QSize(24, 24))
+            bouton.setAutoRaise(True)
+            bouton.setToolTip(tr("icone.aide"))
+            bouton.setPopupMode(QtWidgets.QToolButton.ToolButtonPopupMode.InstantPopup)
+            m = QtWidgets.QMenu(bouton)
+            m.addAction(tr("icone.choisir"), lambda mat=p.materiel: self.choisir_icone(mat))
+            m.addAction(tr("icone.defaut"), lambda mat=p.materiel: self.icone_par_defaut(mat))
+            bouton.setMenu(m)
+            self.table.setCellWidget(i, COL_ICONE, bouton)
+            # type : deviné, corrigeable
+            cb = QtWidgets.QComboBox()
+            cb.addItem(tr("type.auto", type=tr("type." + p.type)), "")
+            for t in TYPES:
+                cb.addItem(self.zone.icone_type(t), tr("type." + t), t)
+            cb.setCurrentIndex(max(0, cb.findData(self.r.types.get(p.materiel, ""))))
+            cb.currentIndexChanged.connect(lambda _i, cb=cb, mat=p.materiel: self._changer_type(mat, cb.currentData()))
+            self.table.setCellWidget(i, COL_TYPE, cb)
         self.table.resizeColumnsToContents()
-        self.table.horizontalHeader().setSectionResizeMode(COL_NOM, QtWidgets.QHeaderView.ResizeMode.Stretch)
+        entete = self.table.horizontalHeader()
+        entete.setSectionResizeMode(COL_NOM, QtWidgets.QHeaderView.ResizeMode.ResizeToContents)
+        entete.setSectionResizeMode(COL_MATERIEL, QtWidgets.QHeaderView.ResizeMode.Stretch)
         self._remplissage = False
+
+    def _changer_type(self, materiel: str, type_: str) -> None:
+        if type_:
+            self.r.types[materiel] = type_
+        else:
+            self.r.types.pop(materiel, None)
+        reglages.enregistrer(self.r)
+        QtCore.QTimer.singleShot(0, self.rafraichir)
+
+    def choisir_icone(self, materiel: str, chemin: str | None = None) -> None:
+        """Image au choix (PNG, ICO, SVG, JPG), copiée en 64 px dans le dossier des données."""
+        if chemin is None:
+            chemin, _f = QtWidgets.QFileDialog.getOpenFileName(
+                self, tr("icone.choisir"), "", tr("icone.filtre") + " (*.png *.ico *.svg *.jpg *.jpeg *.bmp)")
+        if not chemin:
+            return
+        image = QtGui.QIcon(chemin).pixmap(64, 64)
+        if image.isNull():
+            QtWidgets.QMessageBox.warning(self, systeme.NOM, tr("icone.illisible"))
+            return
+        import hashlib
+        dossier = systeme.dossier_donnees() / "icones"
+        dossier.mkdir(parents=True, exist_ok=True)
+        nom = hashlib.sha1(materiel.encode("utf-8")).hexdigest()[:16] + ".png"
+        image.save(str(dossier / nom), "PNG")
+        self.r.icones[materiel] = nom
+        reglages.enregistrer(self.r)
+        self.rafraichir()
+        self.zone.actualiser()
+
+    def icone_par_defaut(self, materiel: str) -> None:
+        self.r.icones.pop(materiel, None)
+        reglages.enregistrer(self.r)
+        self.rafraichir()
 
     def _modif_table(self, item: QtWidgets.QTableWidgetItem) -> None:
         if getattr(self, "_remplissage", True):
@@ -203,6 +286,27 @@ class FenetreReglages(QtWidgets.QWidget):
             return
         reglages.enregistrer(self.r)
         self.zone.actualiser()
+
+    # ------------------------------------------------------------ assistant administrateur
+    def _etat_assistant(self) -> None:
+        from . import assistant
+        present = assistant.installe()
+        self.etat_assistant.setText(tr("assistant.present") if present else tr("assistant.absent"))
+        self.b_assistant.setText(tr("assistant.retirer") if present else tr("assistant.installer"))
+        self.b_assistant.setEnabled(systeme.WINDOWS)
+
+    def _basculer_assistant(self) -> None:
+        from . import assistant
+        if assistant.installe():
+            assistant.desinstaller()
+        elif not assistant.installer():
+            QtWidgets.QMessageBox.warning(self, systeme.NOM, tr("admin.uac_refuse"))
+        self._etat_assistant()
+
+    def _changer_theme(self) -> None:
+        self.r.theme = self.cb_theme.currentData() or "sombre"
+        reglages.enregistrer(self.r)
+        self.zone.appliquer_theme()
 
     # ------------------------------------------------------------ raccourcis, langue
     def _modif_raccourcis(self, *_args, appliquer: bool = True) -> None:

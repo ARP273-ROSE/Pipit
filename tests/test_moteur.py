@@ -9,7 +9,7 @@ def test_seuls_les_externes_sont_proposes():
     ids = [p.id for p in peripheriques.lister()]
     assert "USB\\VID_0781&PID_558C\\AA01" in ids
     assert not any("PCIIDE" in i for i in ids), "disque SATA interne proposé"
-    assert len(ids) == 3
+    assert len(ids) == 5                     # 3 clés/cartes, 1 SSD, 1 iPad
 
 
 def test_disque_systeme_jamais_propose():
@@ -117,3 +117,76 @@ def test_suffixes_de_windows_retires():
     assert nettoyer_nom("Micron CT4000X6SSD9 SCSI Disk Device") == "Micron CT4000X6SSD9"
     assert nettoyer_nom("SanDisk Extreme Pro USB Device") == "SanDisk Extreme Pro"
     assert nettoyer_nom("Kingston DataTraveler 3.0") == "Kingston DataTraveler 3.0"
+
+
+
+# ------------------------------------------------------------ 0.2.0
+def test_types_devines():
+    types = {p.nom: p.type for p in peripheriques.lister()}
+    assert types["Kingston DataTraveler 3.0"] == "cle"
+    assert types["Generic STORAGE DEVICE"] == "carte"
+    assert types["Samsung Portable SSD T7"] == "ssd"
+    assert types["Apple iPad"] == "tablette"
+
+
+@pytest.mark.parametrize("nom,attendu,options", [
+    ("AV PRO C Fexpress SE", "carte", {}), ("Micron CT4000X6SSD9", "ssd", {}),
+    ("WD Elements 25A2", "hdd", {"ssd": False}), ("ST4000DM004", "interne", {"bus": "SATA"}),
+    ("NIKON Z 8", "photo", {"appareil": "telephone"}), ("Pixel 8", "telephone", {"appareil": "telephone"}),
+    ("HL-DT-ST DVDRAM", "optique", {"appareil": "optique"}),
+])
+def test_types_reels(nom, attendu, options):
+    from pipit.modele import deviner_type
+    bus = options.pop("bus", "USB")
+    assert deviner_type([Disque(1, nom, bus, **options)]) == attendu
+
+
+def test_appareils_masquables_par_option():
+    assert not any(p.type == "tablette" for p in peripheriques.lister(appareils=False))
+
+
+def test_remontage():
+    p = [p for p in peripheriques.lister() if "VID_0951" in p.id][0]
+    assert peripheriques.ejecter(p).ok
+    attente = peripheriques.en_attente_de_retrait()
+    assert [i for i, _n in attente] == [p.id]
+    assert peripheriques.remonter(p.id)["ok"]
+    assert peripheriques.en_attente_de_retrait() == []
+    assert any("VID_0951" in q.id for q in peripheriques.lister())
+
+
+def test_forcer():
+    p = peripheriques.lister()[0]
+    assert peripheriques.forcer(p)["ok"]
+    assert p.id not in [q.id for q in peripheriques.lister()]
+
+
+def test_coupables():
+    p = peripheriques.lister()[0]
+    sans = peripheriques.coupables(p)
+    partout = peripheriques.coupables(p, partout=True)
+    assert sans[0].programme == "WINWORD.EXE" and partout[0].fichiers == ["E:\\Rapport.docx"]
+
+
+def test_assistant_refuse_les_demandes_douteuses():
+    from pipit import assistant
+    assert not assistant.demander("formater", "USB\\VID_1")["ok"]
+    assert not assistant.demander("forcer", "C:\\Windows & del")["ok"]
+    assert assistant._traiter({"action": "rm", "id": "USB\\X"})["detail"] == "demande invalide"
+
+
+def test_assistant_tache_xml():
+    from pipit import assistant
+    xml = assistant.xml_tache()
+    assert "HighestAvailable" in xml and "--assistant" in xml and "<Triggers>" not in xml
+
+
+def test_assistant_traite_ses_fichiers(donnees):
+    import json
+    from pipit import assistant
+    d = assistant.dossier() / "demande-essai.json"
+    d.write_text(json.dumps({"action": "coupables", "id": "USB\\VID_0781&PID_558C\\AA01", "lettres": ["E"]}),
+                 encoding="utf-8")
+    assert assistant.executer() == 0
+    r = json.loads((assistant.dossier() / "reponse-essai.json").read_text(encoding="utf-8"))
+    assert r["ok"] and r["coupables"][0]["programme"] == "WINWORD.EXE"
