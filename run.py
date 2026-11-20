@@ -196,8 +196,13 @@ def main() -> int:
     ap.add_argument("--version", action="version", version=f"Pipit {__version__}")
     args = ap.parse_args()
 
-    from PyQt6 import QtCore
-    choix = args.lang or QtCore.QSettings("ARP273-ROSE", NOM).value("langue", "auto", type=str)
+    choix = args.lang
+    if not choix:
+        try:
+            from PyQt6 import QtCore
+            choix = QtCore.QSettings("ARP273-ROSE", NOM).value("langue", "auto", type=str)
+        except ImportError:                    # --lister / --ejecter marchent sans Qt
+            choix = "auto"
     definir_langue(choix if choix in ("fr", "en") else None)
 
     if args.lister:
@@ -205,6 +210,7 @@ def main() -> int:
     if args.ejecter:
         return _ejecter(args.ejecter)
 
+    from PyQt6 import QtCore
     if sys.platform == "win32":
         import ctypes
         mutex = ctypes.windll.kernel32.CreateMutexW(None, False, f"{NOM}EnCours")
