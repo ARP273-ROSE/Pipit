@@ -66,7 +66,8 @@ def lancer_avec_windows(oui: bool) -> bool:
         return False
     import winreg
     try:
-        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, CLE_RUN, 0, winreg.KEY_SET_VALUE) as k:
+        # CreateKeyEx : la clé « Run » n'existe pas toujours sur un compte neuf
+        with winreg.CreateKeyEx(winreg.HKEY_CURRENT_USER, CLE_RUN, 0, winreg.KEY_SET_VALUE) as k:
             if oui:
                 winreg.SetValueEx(k, NOM, 0, winreg.REG_SZ, commande_demarrage())
             else:
