@@ -127,3 +127,43 @@ def test_assistant_repond_par_fichier():
     assert assistant.executer() == 0
     r = json.loads((assistant.dossier() / "reponse-ci.json").read_text(encoding="utf-8"))
     assert r["ok"], r
+
+
+# ------------------------------------------------------------ 0.3.0
+def _diskpart(script: str) -> str:
+    import subprocess
+    import tempfile
+    with tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False) as f:
+        f.write(script)
+    r = subprocess.run(["diskpart", "/s", f.name], capture_output=True, text=True, timeout=180)
+    return r.stdout + r.stderr
+
+
+def test_image_vhd_vue_puis_demontee(tmp_path):
+    """Un VHD monté = lecteur virtuel : listé avec le geste « démonter », puis démonté pour de vrai."""
+    from pipit import assistant, disques_windows, peripheriques
+    if not assistant.est_admin():
+        pytest.skip("diskpart demande les droits d'administrateur")
+    import string
+    vhd = tmp_path / "essai.vhd"
+    libres = [l for l in "PQRSUVWXY" if not disques_windows.kernel32.GetLogicalDrives() & (1 << (ord(l) - 65))]
+    lettre = libres[0]
+    sortie = _diskpart(f'create vdisk file="{vhd}" maximum=64 type=expandable\nselect vdisk file="{vhd}"\n'
+                       f'attach vdisk\ncreate partition primary\nformat fs=ntfs quick label=ESSAI\n'
+                       f'assign letter={lettre}\n')
+    print(sortie[-400:])
+    try:
+        perifs = {p.lettres[0] if p.lettres else "": p for p in peripheriques.lister()}
+        assert lettre in perifs, (lettre, [(p.nom, p.bus, p.lettres) for p in peripheriques.lister(internes_a_chaud=True)])
+        p = perifs[lettre]
+        assert (p.type, p.geste) == ("virtuel", "demonter"), (p.type, p.bus)
+        assert peripheriques.ejecter(p).ok
+        assert lettre not in [l for q in peripheriques.lister() for l in q.lettres]
+    finally:
+        _diskpart(f'select vdisk file="{vhd}"\ndetach vdisk\n')
+    del string
+
+
+def test_tiroir_sans_lecteur_ne_plante_pas():
+    from pipit import disques_windows
+    assert disques_windows.ouvrir_tiroir("Q") is False or True

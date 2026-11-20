@@ -22,7 +22,7 @@ class Disque:
     appareil: str = ""               # "" = disque ; sinon telephone, tablette, photo, optique (pas de stockage)
 
 
-TYPES = ("cle", "carte", "ssd", "hdd", "interne", "optique", "telephone", "tablette", "photo", "autre")
+TYPES = ("cle", "carte", "ssd", "hdd", "interne", "optique", "virtuel", "telephone", "tablette", "photo", "autre")
 
 _MOTS_CARTE = re.compile(r"\b(SD|SDXC|SDHC|MICRO ?SD|CF|CFAST|C ?F ?EXPRESS|FEXPRESS|XQD|MMC|MS|MEMORY STICK|CARD|"
                          r"CARDREADER|READER|LECTEUR)\b|FEXPRESS|CARD ?READER", re.I)
@@ -35,6 +35,8 @@ def deviner_type(disques: list["Disque"]) -> str:
     """Clé, carte mémoire, SSD, disque dur, téléphone… d'après ce que Windows en dit."""
     d0 = disques[0]
     noms = " ".join(d.nom for d in disques)
+    if d0.bus == "Fichier":                 # image ISO, VHD/VHDX montée
+        return "virtuel"
     if d0.appareil:
         if d0.appareil == "telephone" and _TABLETTE.search(noms):
             return "tablette"
@@ -101,6 +103,16 @@ class Peripherique:
         return deviner_type(self.disques) if self.disques else "autre"
 
     @property
+    def geste(self) -> str:
+        """Ce que fait un clic : « ejecter », « tiroir » (lecteur CD/DVD, ouvre le tiroir) ou
+        « demonter » (image ISO/VHD)."""
+        if self.type == "virtuel":
+            return "demonter"
+        if self.type == "optique":
+            return "tiroir"
+        return "ejecter"
+
+    @property
     def lecteur_de_cartes(self) -> bool:
         """Plusieurs fentes derrière un même boîtier : éjecter une carte retire TOUT le
         lecteur (Windows ne sait pas faire autrement), d'où la question posée avant."""
@@ -112,6 +124,10 @@ def regrouper(disques: list[Disque]) -> list[Peripherique]:
     for d in disques:
         if d.id_ejectable:
             groupes.setdefault(d.id_ejectable, []).append(d)
+        elif (d.appareil == "optique" or d.bus == "Fichier") and d.lettres and d.id_disque:
+            # lecteur CD/DVD interne ou lecteur virtuel : rien à « débrancher », mais un tiroir
+            # à ouvrir ou une image à démonter
+            groupes.setdefault(d.id_disque, []).append(d)
     perifs = [Peripherique(i, sorted(ds, key=lambda d: (d.lettres or ["~"])[0])) for i, ds in groupes.items()]
     return sorted(perifs, key=lambda p: ((p.lettres or ["~"])[0], p.nom))
 

@@ -118,7 +118,8 @@ class Zone(QtCore.QObject):
     def lister(self, avec_masques: bool = False) -> list[Peripherique]:
         try:
             return peripheriques.lister(set(self.reglages.masques), self.reglages.internes_a_chaud,
-                                        avec_masques=avec_masques, appareils=self.reglages.appareils)
+                                        avec_masques=avec_masques, appareils=self.reglages.appareils,
+                                        optiques=self.reglages.optiques)
         except Exception:                                # noqa: BLE001 — l'icône ne doit pas mourir
             return []
 
@@ -140,6 +141,8 @@ class Zone(QtCore.QObject):
             morceaux.append(f"({taille})")
         elif not p.lettres and not any(d.appareil for d in p.disques):
             morceaux.append(tr("zone.vide"))
+        if p.geste != "ejecter":
+            morceaux.append("— " + tr(f"geste.{p.geste}"))
         return "  ".join(m for m in morceaux if m)
 
     # ------------------------------------------------------------ menus
@@ -167,15 +170,23 @@ class Zone(QtCore.QObject):
                 a.setToolTip(ident)
                 a.triggered.connect(lambda _=False, i=ident, n=nom: self.remonter(i, n))
         if complet:
-            if self._derniers:
+            ejectables = [p for p in self._derniers if p.geste == "ejecter"]
+            tiroirs = [p for p in self._derniers if p.geste == "tiroir"]
+            if ejectables:
                 menu.addSeparator()
                 forcer = menu.addMenu(tr("zone.forcer"))
                 coupables = menu.addMenu(tr("zone.coupables"))
-                for p in self._derniers:
+                for p in ejectables:
                     forcer.addAction(self.icone_de(p), self.libelle(p), lambda p=p: self.forcer(p))
                     if p.lettres:
                         coupables.addAction(self.icone_de(p), self.libelle(p), lambda p=p: self.chercher_coupables(p))
-                coupables.setEnabled(any(p.lettres for p in self._derniers))
+                coupables.setEnabled(any(p.lettres for p in ejectables))
+            if tiroirs:
+                fermer = menu.addMenu(tr("zone.fermer_tiroir"))
+                for p in tiroirs:
+                    fermer.addAction(self.icone_de(p), self.libelle(p),
+                                     lambda p=p: threading.Thread(target=peripheriques.fermer_tiroir, args=(p,),
+                                                                  daemon=True).start())
             lettres = [(l, p) for p in self._derniers for l in p.lettres]
             if lettres:
                 sous = menu.addMenu(tr("zone.ouvrir"))
@@ -230,7 +241,7 @@ class Zone(QtCore.QObject):
     def ejecter(self, p: Peripherique, demander: bool = True) -> None:
         if p.id in self.en_cours:
             return
-        if demander and p.lecteur_de_cartes and self.reglages.demander_lecteur_cartes:
+        if demander and p.geste == "ejecter" and p.lecteur_de_cartes and self.reglages.demander_lecteur_cartes:
             if not self._confirmer_lecteur(p):
                 return
         self.en_cours.add(p.id)
@@ -245,8 +256,10 @@ class Zone(QtCore.QObject):
         threading.Thread(target=travail, daemon=True, name="pipit-ejection").start()
 
     def tout_ejecter(self) -> None:
+        # « tout éjecter » ne doit pas ouvrir les tiroirs ni démonter les images ISO
         for p in self.lister():
-            self.ejecter(p, demander=False)
+            if p.geste == "ejecter":
+                self.ejecter(p, demander=False)
 
     def _confirmer_lecteur(self, p: Peripherique) -> bool:
         boite = QtWidgets.QMessageBox()
@@ -272,7 +285,13 @@ class Zone(QtCore.QObject):
         self.en_cours.discard(p.id)
         self.actualiser()
         if r.ok:
-            self._notifier_ok(self.nom(p))
+            if p.geste == "ejecter":
+                self._notifier_ok(self.nom(p))
+            elif self.reglages.notifier and p.geste == "demonter":
+                self.tray.showMessage(tr("demonte.titre"), tr("demonte.texte", nom=self.nom(p)), self.icone, 3000)
+            return
+        if p.geste != "ejecter":
+            QtWidgets.QMessageBox.warning(None, systeme.NOM, tr(f"echec.{p.geste}", nom=self.nom(p)))
             return
         self._refus(p, r)
 
@@ -313,9 +332,11 @@ class Zone(QtCore.QObject):
             lignes.append(tr("refus.inconnu"))
         boite.setInformativeText("\n".join(lignes))
         fermables = [b for b in r.bloqueurs if b.fermable]
-        fermer = None
+        fermer = montrer = None
         if fermables:
             noms = ", ".join(sorted({b.programme for b in fermables}))
+            montrer = boite.addButton(tr("refus.montrer", programme=fermables[0].programme),
+                                      QtWidgets.QMessageBox.ButtonRole.ActionRole)
             fermer = boite.addButton(tr("refus.fermer", programme=noms), QtWidgets.QMessageBox.ButtonRole.ActionRole)
         chercher = None
         if p.lettres:
@@ -325,7 +346,9 @@ class Zone(QtCore.QObject):
         boite.addButton(tr("dlg.annuler"), QtWidgets.QMessageBox.ButtonRole.RejectRole)
         boite.exec()
         clic = boite.clickedButton()
-        if fermer is not None and clic is fermer:
+        if montrer is not None and clic is montrer:
+            bloqueurs.montrer(fermables[0].pid)
+        elif fermer is not None and clic is fermer:
             for b in fermables:
                 bloqueurs.fermer(b)
             QtCore.QTimer.singleShot(2500, lambda: self.ejecter(p, demander=False))

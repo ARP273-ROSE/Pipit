@@ -425,3 +425,51 @@ def en_attente_de_retrait() -> list[tuple[str, str]]:
     finally:
         setupapi.SetupDiDestroyDeviceInfoList(hdev)
     return trouves
+
+
+# ------------------------------------------------------------------ lecteurs CD/DVD et images
+IOCTL_STORAGE_EJECT_MEDIA, IOCTL_STORAGE_LOAD_MEDIA = 0x2D4808, 0x2D480C
+
+
+def _tiroir(lettre: str, code: int) -> bool:
+    h = kernel32.CreateFileW(f"\\\\.\\{lettre}:", 0x80000000, FILE_SHARE_RW, None, OPEN_EXISTING, 0, None)
+    if h in (None, INVALID_HANDLE):
+        return False
+    try:
+        return _ioctl(h, code, taille_sortie=0) is not None
+    finally:
+        kernel32.CloseHandle(h)
+
+
+def ouvrir_tiroir(lettre: str) -> bool:
+    """Le bouton du lecteur, sans se lever : Windows libère le disque puis ouvre le tiroir."""
+    return _tiroir(lettre, IOCTL_STORAGE_EJECT_MEDIA)
+
+
+def fermer_tiroir(lettre: str) -> bool:
+    return _tiroir(lettre, IOCTL_STORAGE_LOAD_MEDIA)
+
+
+def demonter_image(lettre: str) -> bool:
+    """Image ISO / VHD montée : le geste « Éjecter » de l'Explorateur (sans droits pour une ISO),
+    puis Dismount-DiskImage en secours. Réussi si la lettre a disparu."""
+    import subprocess
+    import time
+    if not (len(lettre) == 1 and lettre.isalpha()):
+        return False
+    lettre = lettre.upper()
+    scripts = [
+        f"(New-Object -ComObject Shell.Application).Namespace(17).ParseName('{lettre}:\\').InvokeVerb('Eject')",
+        f"Get-Volume -DriveLetter {lettre} | Get-DiskImage | Dismount-DiskImage | Out-Null",
+    ]
+    for script in scripts:
+        try:
+            subprocess.run(["powershell", "-NoProfile", "-NonInteractive", "-Command", script],
+                           capture_output=True, timeout=30, creationflags=0x08000000)
+        except (OSError, subprocess.SubprocessError):
+            continue
+        for _ in range(10):
+            if not kernel32.GetLogicalDrives() & (1 << (ord(lettre) - 65)):
+                return True
+            time.sleep(0.3)
+    return False

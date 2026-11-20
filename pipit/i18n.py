@@ -305,4 +305,18 @@ TEXTES: dict[str, dict[str, str]] = {
     "opt.theme": _t("Thème", "Theme"),
     "theme.sombre": _t("Sombre", "Dark"),
     "theme.clair": _t("Clair", "Light"),
+    # ---- 0.3.0 : lecteurs CD/DVD et images
+    "type.virtuel": _t("Lecteur virtuel (ISO, VHD)", "Virtual drive (ISO, VHD)"),
+    "geste.tiroir": _t("ouvrir le tiroir", "open the tray"),
+    "geste.demonter": _t("démonter l'image", "unmount the image"),
+    "zone.fermer_tiroir": _t("Fermer le tiroir", "Close the tray"),
+    "demonte.titre": _t("Image démontée", "Image unmounted"),
+    "demonte.texte": _t("« {nom} » n'est plus monté.", "“{nom}” is no longer mounted."),
+    "echec.tiroir": _t("Le tiroir de « {nom} » ne s'est pas ouvert (disque en cours de lecture ou de gravure ?).",
+                       "The tray of “{nom}” did not open (disc being read or burned?)."),
+    "echec.demonter": _t("« {nom} » n'a pas pu être démonté. Fermez les fichiers ouverts depuis ce lecteur, puis "
+                         "réessayez.",
+                         "“{nom}” could not be unmounted. Close the files opened from this drive, then try again."),
+    "opt.optiques": _t("Montrer les lecteurs CD/DVD et les images ISO/VHD", "Show CD/DVD drives and ISO/VHD images"),
+    "refus.montrer": _t("Montrer {programme}", "Show {programme}"),
 }

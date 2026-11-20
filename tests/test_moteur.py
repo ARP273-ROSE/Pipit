@@ -9,7 +9,7 @@ def test_seuls_les_externes_sont_proposes():
     ids = [p.id for p in peripheriques.lister()]
     assert "USB\\VID_0781&PID_558C\\AA01" in ids
     assert not any("PCIIDE" in i for i in ids), "disque SATA interne proposé"
-    assert len(ids) == 5                     # 3 clés/cartes, 1 SSD, 1 iPad
+    assert len(ids) == 7                     # 3 clés/cartes, 1 SSD, 1 iPad, 1 DVD, 1 ISO
 
 
 def test_disque_systeme_jamais_propose():
@@ -205,3 +205,25 @@ def test_explorateur_sur_la_racine_seule_pas_coupable():
     garde = poignees.filtrer([poignees.Coupable(1, "explorer.exe", fichiers=["I:\\", "I:\\"]),
                               poignees.Coupable(2, "explorer.exe", fichiers=["I:\\Photos\\a.jpg"])])
     assert [c.pid for c in garde] == [2]
+
+
+# ------------------------------------------------------------ 0.3.0
+def test_dvd_et_iso():
+    from pipit import demo
+    perifs = {p.nom: p for p in peripheriques.lister()}
+    dvd, iso = perifs["HL-DT-ST DVDRAM GH24NSD1"], perifs["Microsoft Virtual DVD-ROM"]
+    assert (dvd.type, dvd.geste) == ("optique", "tiroir")
+    assert (iso.type, iso.geste) == ("virtuel", "demonter")
+    assert peripheriques.ejecter(dvd).ok and demo._tiroirs["T"] is True
+    assert peripheriques.fermer_tiroir(dvd) and demo._tiroirs["T"] is False
+    assert peripheriques.ejecter(iso).ok
+    assert "Microsoft Virtual DVD-ROM" not in [p.nom for p in peripheriques.lister()]
+    assert "HL-DT-ST DVDRAM GH24NSD1" in [p.nom for p in peripheriques.lister()]   # le lecteur reste
+
+
+def test_dvd_masquables_par_option():
+    assert not any(p.type in ("optique", "virtuel") for p in peripheriques.lister(optiques=False))
+
+
+def test_montrer_programme():
+    assert bloqueurs.montrer(4242)

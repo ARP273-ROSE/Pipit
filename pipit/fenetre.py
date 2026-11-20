@@ -106,6 +106,7 @@ class FenetreReglages(QtWidgets.QWidget):
         self.c_internes = self._case(ol, tr("opt.internes"), self.r.internes_a_chaud, "internes_a_chaud")
         self.c_internes.setToolTip(tr("opt.internes.aide"))
         self.c_appareils = self._case(ol, tr("opt.appareils"), self.r.appareils, "appareils")
+        self.c_optiques = self._case(ol, tr("opt.optiques"), self.r.optiques, "optiques")
         self.c_compteur = self._case(ol, tr("opt.compteur"), self.r.compteur, "compteur")
         self.c_rappel = self._case(ol, tr("opt.rappel"), self.r.rappel_fermeture, "rappel_fermeture")
         self.c_rappel.setToolTip(tr("opt.rappel.aide"))

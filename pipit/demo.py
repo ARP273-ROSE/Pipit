@@ -29,13 +29,18 @@ _DISQUES = [
            "USB\\ROOT_HUB30\\5", False, ssd=True),
     Disque(-1, "Apple iPad", "USB", 0, [], [], "SWD\\WPDBUSENUM\\IPAD", "USB\\VID_05AC&PID_12AB\\DD04",
            "USB\\ROOT_HUB30\\5", appareil="telephone"),
+    Disque(1000, "HL-DT-ST DVDRAM GH24NSD1", "SATA", 0, ["T"], [""], "SCSI\\CDROM&VEN_HL-DT-ST\\10",
+           appareil="optique"),
+    Disque(1001, "Microsoft Virtual DVD-ROM", "Fichier", 4_700_000_000, ["V"], ["WIN11_FR"],
+           "SCSI\\CDROM&VEN_MSFT&PROD_VIRTUAL_DVD-ROM\\11", appareil="optique"),
 ]
+_tiroirs: dict[str, bool] = {}
 
 
 def lister() -> list[Disque]:
     if os.environ.get("PIPIT_DEMO_VIDE") == "1":
-        return [d for d in _DISQUES if d.bus in ("NVMe", "SATA")]
-    return [d for d in _DISQUES if d.id_ejectable not in _retires]
+        return [d for d in _DISQUES if d.bus in ("NVMe", "SATA") and not d.appareil]
+    return [d for d in _DISQUES if d.id_ejectable not in _retires and d.id_disque not in _retires]
 
 
 def ejecter(id_ejectable: str) -> tuple[int, str]:
@@ -46,8 +51,27 @@ def ejecter(id_ejectable: str) -> tuple[int, str]:
     return 0, ""
 
 
+def ouvrir_tiroir(lettre: str) -> bool:
+    _tiroirs[lettre] = True
+    return True
+
+
+def fermer_tiroir(lettre: str) -> bool:
+    _tiroirs[lettre] = False
+    return True
+
+
+def demonter_image(lettre: str) -> bool:
+    for d in _DISQUES:
+        if lettre in d.lettres and d.bus == "Fichier":
+            _retires.add(d.id_disque)
+            return True
+    return False
+
+
 def remettre() -> None:
     _retires.clear()
+    _tiroirs.clear()
     _en_attente.clear()
 
 

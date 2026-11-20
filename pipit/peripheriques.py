@@ -35,21 +35,24 @@ def tous_les_disques() -> list[Disque]:
     return _moteur().lister()
 
 
-def visible(p: Peripherique, internes_a_chaud: bool = False, appareils: bool = True) -> bool:
+def visible(p: Peripherique, internes_a_chaud: bool = False, appareils: bool = True,
+            optiques: bool = True) -> bool:
     """Externe (USB, carte SD…), jamais le disque de Windows. Les disques SATA branchés
     à chaud passent pour « amovibles » aux yeux de Windows : cachés sauf demande.
     Téléphones, tablettes, appareils photo : montrés sauf demande."""
     if any(d.systeme for d in p.disques):
         return False
-    if any(d.appareil and d.appareil != "optique" for d in p.disques):
+    if p.type in ("optique", "virtuel"):
+        return optiques and bool(p.lettres)
+    if any(d.appareil for d in p.disques):
         return appareils
     return internes_a_chaud or p.bus in BUS_EXTERNES
 
 
 def lister(masques: set[str] | None = None, internes_a_chaud: bool = False,
-           avec_masques: bool = False, appareils: bool = True) -> list[Peripherique]:
+           avec_masques: bool = False, appareils: bool = True, optiques: bool = True) -> list[Peripherique]:
     masques = {m.upper() for m in (masques or set())}
-    perifs = [p for p in regrouper(tous_les_disques()) if visible(p, internes_a_chaud, appareils)]
+    perifs = [p for p in regrouper(tous_les_disques()) if visible(p, internes_a_chaud, appareils, optiques)]
     if not avec_masques:
         perifs = [p for p in perifs if p.materiel not in masques]
     return perifs
@@ -89,7 +92,14 @@ def memoriser(p: Peripherique) -> None:
 
 def ejecter(p: Peripherique, essais: int = 2) -> Resultat:
     """Éjecte ; en cas de refus, refait un essai (un antivirus qui scanne la clé la lâche
-    souvent dans la seconde) puis cherche qui retient le périphérique."""
+    souvent dans la seconde) puis cherche qui retient le périphérique. Un lecteur CD/DVD
+    ouvre son tiroir ; une image ISO/VHD est démontée."""
+    if p.geste == "tiroir":
+        ok = _moteur().ouvrir_tiroir(p.lettres[0])
+        return Resultat(ok, 0 if ok else -1, "" if ok else "tiroir")
+    if p.geste == "demonter":
+        ok = all(_moteur().demonter_image(l) for l in p.lettres)
+        return Resultat(ok, 0 if ok else -1, "" if ok else "image")
     debut = time.time()
     veto, nom = 0, ""
     for i in range(essais):
@@ -151,3 +161,7 @@ def coupables(p: Peripherique, partout: bool = False) -> list | None:
     if not r.get("ok"):
         return None
     return [poignees.Coupable(**c) for c in r.get("coupables", [])]
+
+
+def fermer_tiroir(p: Peripherique) -> bool:
+    return bool(p.lettres) and _moteur().fermer_tiroir(p.lettres[0])

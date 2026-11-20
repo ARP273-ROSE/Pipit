@@ -47,7 +47,7 @@ def test_menu_liste_les_peripheriques(zone):
     zone.construire_menu(zone.menu_complet, complet=True)
     complet = _textes(zone.menu_complet)
     assert tr("menu.quitter") in complet and tr("zone.forcer") in complet and tr("zone.coupables") in complet
-    assert "Pipit — 5" in zone.tray.toolTip()
+    assert "Pipit — 7" in zone.tray.toolTip()
 
 
 def test_icone_avec_compteur(zone):
@@ -114,7 +114,7 @@ def test_reglages_nom_et_masque(app, zone):
     from pipit.fenetre import COL_MASQUE, COL_NOM
     zone.ouvrir_reglages()
     f = zone.fenetre
-    assert f.table.rowCount() == 5
+    assert f.table.rowCount() == 7
     f.table.item(0, COL_NOM).setText("Ma sauvegarde")
     f.table.item(0, COL_MASQUE).setCheckState(QtCore.Qt.CheckState.Checked)
     r = reglages.charger()
@@ -155,3 +155,11 @@ def test_raison_du_refus(zone):
     from pipit import peripheriques
     r = peripheriques.Resultat(False, peripheriques.VETO_SERVICE, "SysMain")
     assert "SysMain" in zone.raison(r)
+
+
+def test_tout_ejecter_ne_touche_ni_tiroir_ni_iso(app, zone):
+    from pipit import demo
+    zone.tout_ejecter()
+    assert attendre(app, lambda: not zone.en_cours)
+    restants = {p.type for p in zone.lister()}
+    assert restants == {"optique", "virtuel"} and not demo._tiroirs

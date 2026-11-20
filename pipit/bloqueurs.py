@@ -115,3 +115,29 @@ def fermer(b: Bloqueur) -> bool:
         return r.returncode == 0
     except (OSError, subprocess.SubprocessError):
         return False
+
+
+def montrer(pid: int) -> bool:
+    """Met au premier plan la fenêtre du programme (pour enregistrer et fermer soi-même)."""
+    if sys.platform != "win32" or os.environ.get("PIPIT_DEMO") == "1":
+        return os.environ.get("PIPIT_DEMO") == "1"
+    import ctypes
+    from ctypes import wintypes
+    u = ctypes.windll.user32
+    trouvees = []
+    PROC = ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
+
+    def rappel(hwnd, _l):
+        proprietaire = wintypes.DWORD()
+        u.GetWindowThreadProcessId(hwnd, ctypes.byref(proprietaire))
+        if proprietaire.value == pid and u.IsWindowVisible(hwnd) and u.GetWindowTextLengthW(hwnd) > 0:
+            trouvees.append(hwnd)
+        return True
+
+    u.EnumWindows(PROC(rappel), 0)
+    if not trouvees:
+        return False
+    hwnd = trouvees[0]
+    if u.IsIconic(hwnd):
+        u.ShowWindow(hwnd, 9)                  # SW_RESTORE
+    return bool(u.SetForegroundWindow(hwnd))

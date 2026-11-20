@@ -21,6 +21,7 @@ class Reglages:
     icones: dict[str, str] = field(default_factory=dict)   # matériel → image choisie (dossier des données)
     types: dict[str, str] = field(default_factory=dict)    # matériel → type corrigé à la main
     appareils: bool = True                # téléphones, tablettes, appareils photo
+    optiques: bool = True                 # lecteurs CD/DVD (tiroir) et images ISO/VHD montées
     compteur: bool = True                 # nombre de périphériques sur l'icône
     rappel_fermeture: bool = False        # prévenir à la fermeture de session s'il reste des périphériques
 
