@@ -174,6 +174,9 @@ def test_reglages_par_appareil(app, zone, tmp_path, monkeypatch):
     from pipit import demo
     boites = []                     # sous Windows sans écran, RegisterHotKey échoue : boîte « pris »
     monkeypatch.setattr(QtWidgets.QMessageBox, "warning", lambda *a, **k: boites.append(a))
+    # sans zone de notification (offscreen), Qt dessine ses propres bulles ; deux bulles coup sur
+    # coup y ont planté une fois sous Windows (violation d'accès dans la bulle de secours de Qt)
+    monkeypatch.setattr(zone.tray, "showMessage", lambda *a, **k: boites.append(a))
     from pipit.fenetre import COL_OPTIONS, COL_VITESSE, DialogueAppareil
     zone.ouvrir_reglages()
     f = zone.fenetre
@@ -199,8 +202,9 @@ def test_reglages_par_appareil(app, zone, tmp_path, monkeypatch):
     demo.remettre()
 
 
-def test_arrivee_lettre_differente_propose_de_la_remettre(app, zone):
+def test_arrivee_lettre_differente_propose_de_la_remettre(app, zone, monkeypatch):
     from pipit import demo
+    monkeypatch.setattr(zone.tray, "showMessage", lambda *a, **k: None)
     p = [p for p in zone.lister() if "VID_0951" in p.id][0]
     zone.reglages.lettres_fixes[p.materiel] = "K"
     zone._ids_connus = {q.id for q in zone._tous if q.id != p.id}     # comme s'il venait d'arriver
