@@ -6,7 +6,7 @@ Kernel-PnP (événement 225), raccourcis globaux RegisterHotKey.
 
 ## État
 
-- 0.1.0 : première version (voir CHANGELOG.md).
+- 0.1.0 publiée le 20/11/2026 (Setup 43 Mo, archive de MAJ signée). Éjection réelle réussie sur un vrai poste (disque USB CFexpress, code 0, volume disparu).
 
 ## Points d'architecture
 
@@ -23,6 +23,6 @@ Kernel-PnP (événement 225), raccourcis globaux RegisterHotKey.
 ## Reste à faire
 
 - ✅ 20/11 : détection vérifiée sur un vrai poste (2 disques USB vus, SATA/NVMe/système/virtuel exclus).
-- Essai réel d'éjection sur un vrai poste (clé, disque, lecteur multicarte).
+- Reste : essai d'un refus réel (programme fautif nommé), d'un lecteur multicarte, de l'appli complète (icône, Win+Alt à la frappe) installée.
 - ✅ CI windows-latest : RegisterHotKey accepte Win+Alt (MOD_WIN + VK_MENU). Reste à vérifier qu'il se déclenche à la frappe sur un vrai poste.
 - L'entrée « Run » n'est pas retirée par la désinstallation (gabarit commun de l'installeur).
