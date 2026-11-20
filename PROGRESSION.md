@@ -8,6 +8,17 @@ Kernel-PnP (événement 225), raccourcis globaux RegisterHotKey.
 
 - 0.1.0 publiée le 20/11/2026 (Setup 43 Mo, archive de MAJ signée). Éjection réelle réussie sur un vrai poste (disque USB CFexpress, code 0, volume disparu).
 
+- 0.2.0 (20/11/2026, en cours de publication) : éjection forcée, remontage, assistant administrateur
+  (tâche planifiée `Pipit\Assistant`, HighestAvailable, déclenchée par `schtasks /run`, échange par
+  fichiers `assistant/demande-*.json`), coupables par inventaire des poignées, types + icônes,
+  thème clair/sombre, compteur sur l'icône, rappel à la fermeture de session.
+  - Mesuré sur un vrai poste : sans droits d'administrateur, toutes les fonctions de remontage
+    (CM_Setup_DevNode, CM_Reenumerate_DevNode) répondent CR_ACCESS_DENIED (51).
+  - CI windows-latest : création réelle de la tâche, poignées (un sous-processus qui garde un
+    fichier ouvert est trouvé), en 0,1 s.
+  - NON vérifié sur un vrai poste : remontage en administrateur (quelle méthode de
+    `admin_windows.remonter` marche), éjection forcée, téléphones/appareils photo.
+
 ## Points d'architecture
 
 - `pipit/disques_windows.py` : SetupAPI (GUID_DEVINTERFACE_DISK) → numéro de disque,
