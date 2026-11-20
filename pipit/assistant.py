@@ -7,9 +7,12 @@ Conception (après audit de sécurité de la 0.2.0) :
   contournement permanent de l'UAC : n'importe quel programme de la session pourrait
   modifier ce code puis lancer la tâche.
 * Aucun fichier d'échange : Pipit ouvre un canal nommé au nom aléatoire et le processus
-  élevé y répond. Les deux côtés s'authentifient par une clé aléatoire à usage unique
-  (défi HMAC de multiprocessing.connection), transmise sur la ligne de commande du
-  processus élevé, illisible pour un processus non élevé.
+  élevé y répond. Clé aléatoire à usage unique (défi HMAC de multiprocessing.connection)
+  ET vérification des deux bouts : Pipit n'accepte que le processus élevé qu'il vient de
+  lancer (GetNamedPipeClientProcessId), et le processus élevé ne parle qu'au Pipit qui l'a
+  lancé (GetNamedPipeServerProcessId). La clé seule ne suffit pas : la ligne de commande
+  d'un processus élevé peut se lire depuis la session (PROCESS_QUERY_LIMITED_INFORMATION).
+  Messages en JSON (recv_bytes), jamais pickle.
 * Le processus élevé ne croit pas ce qu'on lui envoie : il ne reçoit qu'une action et un
   identifiant de périphérique, recalcule lui-même le périphérique et ses lettres, et
   refuse tout ce qui n'est pas un périphérique externe éjectable (forcer, coupables) ou
@@ -74,6 +77,27 @@ def retirer_ancienne_tache() -> bool:
 # ------------------------------------------------------------------ élévation
 def _executer_eleve(programme: str, parametres: str, attendre: float = 120.0) -> int | None:
     """ShellExecuteEx « runas » : une fenêtre UAC ; renvoie le code de sortie (None = refusé)."""
+    lance = _lancer_eleve(programme, parametres)
+    if lance is None:
+        return None
+    return _attendre_processus(lance[0], attendre)
+
+
+def _attendre_processus(h, attendre: float) -> int:
+    from ctypes import wintypes
+    k32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    k32.WaitForSingleObject.argtypes = [wintypes.HANDLE, wintypes.DWORD]
+    k32.GetExitCodeProcess.argtypes = [wintypes.HANDLE, ctypes.POINTER(wintypes.DWORD)]
+    k32.CloseHandle.argtypes = [wintypes.HANDLE]
+    k32.WaitForSingleObject(h, int(attendre * 1000))
+    code = wintypes.DWORD(1)
+    k32.GetExitCodeProcess(h, ctypes.byref(code))
+    k32.CloseHandle(h)
+    return code.value
+
+
+def _lancer_eleve(programme: str, parametres: str):
+    """(poignée du processus, pid) ou None si l'UAC est refusé."""
     from ctypes import wintypes
 
     class SHELLEXECUTEINFOW(ctypes.Structure):
@@ -93,14 +117,18 @@ def _executer_eleve(programme: str, parametres: str, attendre: float = 120.0) ->
     if not shell32.ShellExecuteExW(ctypes.byref(info)) or not info.hProcess:
         return None
     k32 = ctypes.WinDLL("kernel32", use_last_error=True)
-    k32.WaitForSingleObject.argtypes = [wintypes.HANDLE, wintypes.DWORD]
-    k32.GetExitCodeProcess.argtypes = [wintypes.HANDLE, ctypes.POINTER(wintypes.DWORD)]
-    k32.CloseHandle.argtypes = [wintypes.HANDLE]
-    k32.WaitForSingleObject(info.hProcess, int(attendre * 1000))
-    code = wintypes.DWORD(1)
-    k32.GetExitCodeProcess(info.hProcess, ctypes.byref(code))
-    k32.CloseHandle(info.hProcess)
-    return code.value
+    k32.GetProcessId.argtypes = [wintypes.HANDLE]
+    return info.hProcess, k32.GetProcessId(info.hProcess)
+
+
+def _pid_du_bout(conn, cote: str) -> int:
+    """Pid du client (côté Pipit) ou du serveur (côté élevé) d'un canal nommé."""
+    from ctypes import wintypes
+    k32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    fonction = k32.GetNamedPipeClientProcessId if cote == "client" else k32.GetNamedPipeServerProcessId
+    fonction.argtypes = [wintypes.HANDLE, ctypes.POINTER(wintypes.ULONG)]
+    pid = wintypes.ULONG(0)
+    return pid.value if fonction(conn.fileno(), ctypes.byref(pid)) else -1
 
 
 # ------------------------------------------------------------------ côté Pipit : demander
@@ -114,6 +142,8 @@ def demander(action: str, ident: str, delai: float = 120.0) -> dict:
     if os.environ.get("PIPIT_DEMO") == "1" or sys.platform != "win32":
         from . import demo
         return demo.assistant(action, ident)
+    import json
+    import time
     from multiprocessing.connection import Client, Listener
     with _un_a_la_fois:
         canal = "\\\\.\\pipe\\pipit-" + secrets.token_hex(16)
@@ -122,33 +152,53 @@ def demander(action: str, ident: str, delai: float = 120.0) -> dict:
             ecoute = Listener(address=canal, family="AF_PIPE", authkey=cle)
         except OSError as exc:
             return {"ok": False, "detail": f"canal: {exc}"}
-        reponse: dict = {}
+        try:
+            script = Path(__file__).resolve().parent.parent / "run.py"
+            args = subprocess.list2cmdline([str(script), "--assistant", action, ident, canal, cle.hex(),
+                                            str(os.getpid())])
+            lance = _lancer_eleve(systeme.executable_fenetre(), args)
+            if lance is None:
+                return {"ok": False, "detail": "uac_refuse"}
+            h_proc, pid_eleve = lance
+            reponse: dict = {}
+            fin = time.time() + delai
 
-        def attendre_reponse():
-            try:
-                with ecoute.accept() as conn:
-                    if conn.poll(delai):
-                        donnees = conn.recv()
-                        if isinstance(donnees, dict):
-                            reponse.update(donnees)
-            except Exception:                       # noqa: BLE001 — authentification ratée, canal coupé
-                pass
+            def attendre_reponse():
+                # n'accepte QUE le processus élevé lancé à l'instant ; les autres sont congédiés
+                while time.time() < fin and not reponse:
+                    try:
+                        conn = ecoute.accept()
+                    except Exception:               # noqa: BLE001 — défi raté, canal fermé
+                        if time.time() >= fin:
+                            return
+                        continue
+                    with conn:
+                        if _pid_du_bout(conn, "client") != pid_eleve:
+                            continue
+                        try:
+                            if conn.poll(max(0.0, fin - time.time())):
+                                donnees = json.loads(conn.recv_bytes(1 << 20).decode("utf-8"))
+                                if isinstance(donnees, dict):
+                                    reponse.update(donnees)
+                                    reponse.setdefault("ok", False)
+                        except Exception:           # noqa: BLE001
+                            pass
+                    return
 
-        fil = threading.Thread(target=attendre_reponse, daemon=True, name="pipit-canal")
-        fil.start()
-        script = Path(__file__).resolve().parent.parent / "run.py"
-        args = subprocess.list2cmdline([str(script), "--assistant", action, ident, canal, cle.hex()])
-        code = _executer_eleve(systeme.executable_fenetre(), args, delai)
-        if fil.is_alive():                           # personne ne s'est connecté : on débloque accept()
-            try:
-                Client(canal, family="AF_PIPE", authkey=cle).close()
-            except Exception:                       # noqa: BLE001
-                pass
-            fil.join(2)
-        ecoute.close()
-        if code is None:
-            return {"ok": False, "detail": "uac_refuse"}
-        return reponse or {"ok": False, "detail": f"sans réponse (code {code})"}
+            fil = threading.Thread(target=attendre_reponse, daemon=True, name="pipit-canal")
+            fil.start()
+            code = _attendre_processus(h_proc, delai)
+            fil.join(3)
+            if fil.is_alive():                       # personne ne s'est présenté : on débloque accept()
+                fin = 0
+                try:
+                    Client(canal, family="AF_PIPE", authkey=cle).close()
+                except Exception:                   # noqa: BLE001
+                    pass
+                fil.join(2)
+            return dict(reponse) or {"ok": False, "detail": f"sans réponse (code {code})"}
+        finally:
+            ecoute.close()
 
 
 # ------------------------------------------------------------------ côté élevé : exécuter
@@ -189,20 +239,24 @@ def traiter(action: str, ident: str) -> dict:
 
 
 def executer(arguments: list[str]) -> int:
-    """run.py --assistant <action> <identifiant> <canal> <clé> : processus élevé, une seule demande."""
-    if len(arguments) != 4:
+    """run.py --assistant <action> <identifiant> <canal> <clé> <pid de Pipit> : processus élevé,
+    une seule demande, réponse au seul Pipit qui l'a lancé."""
+    if len(arguments) != 5:
         return 2
-    action, ident, canal, cle_hex = arguments
-    if not _CANAL.match(canal) or not re.fullmatch(r"[0-9a-f]{64}", cle_hex):
+    action, ident, canal, cle_hex, pid_pipit = arguments
+    if not _CANAL.match(canal) or not re.fullmatch(r"[0-9a-f]{64}", cle_hex) or not pid_pipit.isdigit():
         return 2
     try:
         r = traiter(action, ident)
     except Exception as exc:                        # noqa: BLE001
         r = {"ok": False, "detail": f"{type(exc).__name__}: {exc}"}
+    import json
     from multiprocessing.connection import Client
     try:
         with Client(canal, family="AF_PIPE", authkey=bytes.fromhex(cle_hex)) as conn:
-            conn.send(r)
+            if _pid_du_bout(conn, "serveur") != int(pid_pipit):
+                return 4                            # un autre programme a pris la place du canal
+            conn.send_bytes(json.dumps(r, ensure_ascii=False).encode("utf-8"))
     except Exception:                               # noqa: BLE001 — Pipit a abandonné entre-temps
         return 3
     return 0 if r.get("ok") else 1

@@ -12,6 +12,11 @@ Sécurité (audit complet) :
   refuse les disques internes et le disque système ; « remonter » n'agit que sur un périphérique éjecté
   encore branché (problème 47), jamais sur un périphérique désactivé exprès.
 - Plus aucune fermeture de fichiers dans un autre programme (action supprimée).
+- Contre-audit : les deux bouts du canal sont vérifiés (Pipit n'accepte que le processus élevé qu'il a
+  lancé, qui ne répond qu'à ce Pipit) ; messages en JSON, jamais pickle ; l'ancienne tâche est cherchée
+  à chaque démarrage et son retrait proposé aussitôt.
+- La boîte « Insérez un disque » est vraiment coupée (mauvais drapeau corrigé).
+- Éjection forcée : volumes reverrouillés à chaque essai.
 
 Gels, plantages, performance :
 - Liste des périphériques lue en arrière-plan, relue au branchement (WM_DEVICECHANGE) ; sondage de

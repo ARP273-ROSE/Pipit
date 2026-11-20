@@ -272,7 +272,10 @@ TEXTES: dict[str, dict[str, str]] = {
     "admin.uac_refuse": _t("Il faut accepter la demande de Windows (droits d'administrateur) pour ce geste.",
                            "You need to accept the Windows prompt (administrator rights) for this."),
     "coupables.titre": _t("Programmes qui utilisent « {nom} »", "Programs using “{nom}”"),
-    "coupables.inconnu": _t("La recherche n'a pas abouti.", "The search did not complete."),
+    "coupables.inconnu": _t("La recherche n'a pas abouti (un programme ne répond pas). Si cela se répète, "
+                            "quittez puis relancez Pipit.",
+                            "The search did not complete (a program is not responding). If it happens again, "
+                            "quit and restart Pipit."),
     "coupables.aucun": _t("Aucun de vos programmes n'a de fichier ouvert dessus. « Chercher partout » regarde "
                           "aussi les programmes de Windows et l'antivirus (droits d'administrateur).",
                           "None of your programs has a file open on it. “Search everywhere” also looks at "
@@ -322,4 +325,5 @@ TEXTES: dict[str, dict[str, str]] = {
                              "The “Pipit\\Assistant” task from version 0.2.0 is still installed. It is a security "
                              "risk: remove it (one Windows confirmation)."),
     "assistant.retirer_ancienne": _t("Retirer l'ancienne tâche", "Remove the old task"),
+    "dlg.plus_tard": _t("Plus tard", "Later"),
 }

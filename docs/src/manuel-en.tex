@@ -240,8 +240,12 @@ use them behind your back. The administrator part only receives the action and t
 identifier; it checks by itself that it really is an external device (or an ejected device
 still plugged in, for bringing it back) and refuses everything else.
 
-\attention{Version 0.2.0 installed a scheduled task “Pipit\textbackslash Assistant” that
-turned out to be risky. If it is still there, the settings offer to remove it.}
+\attention{The Windows prompt says “Python” (the language Pipit is written in), not “Pipit”.
+It must only appear \emph{right after} you click \menu{Bring back}, \menu{Force} or
+\menu{Search everywhere}. If it pops up for no reason, answer \menu{No}.
+
+Version 0.2.0 installed a scheduled task “Pipit\textbackslash Assistant” that turned out to
+be risky: Pipit looks for it at every start and offers to remove it.}
 
 \section{Updates and incident reports}
 

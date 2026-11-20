@@ -191,7 +191,7 @@ class FenetreReglages(QtWidgets.QWidget):
     def rafraichir(self) -> None:
         self._remplissage = True
         self._ids_affiches = sorted(p.id for p in self.zone._derniers)
-        perifs = self.zone.lister(avec_masques=True)
+        perifs = self.zone._tous                  # lu en arrière-plan : un disque muet ne fige rien
         self.table.setRowCount(len(perifs))
         for i, p in enumerate(perifs):
             valeurs = {COL_LETTRES: ", ".join(f"{l}:" for l in p.lettres),

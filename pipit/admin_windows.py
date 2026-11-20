@@ -59,21 +59,24 @@ def _demonter(lettre: str):
 
 
 def forcer(id_ejectable: str, lettres: list[str]) -> dict:
-    poignees, etapes = [], {}
-    for l in lettres:
-        h, etape = _demonter(l)
-        etapes[l] = etape
-        if h is not None:
-            poignees.append(h)
-    veto, nom = 0, ""
-    try:
-        veto, nom = dw.ejecter(id_ejectable)            # premier essai, volumes encore verrouillés
+    """Chaque essai reverrouille et redémonte les volumes, et les garde verrouillés pendant
+    la demande d'éjection : l'Explorateur ou l'antivirus n'ont pas le temps de les remonter.
+    Si nos propres poignées gênent, un essai sans elles suit aussitôt."""
+    etapes, veto, nom = {}, 0, ""
+    for _ in range(3):
+        poignees = []
+        for l in lettres:
+            h, etape = _demonter(l)
+            etapes[l] = etape
+            if h is not None:
+                poignees.append(h)
+        try:
+            veto, nom = dw.ejecter(id_ejectable)
+        finally:
+            for h in poignees:
+                kernel32.CloseHandle(h)
         if veto in (0, 13):
             return {"ok": True, "etapes": etapes}
-    finally:
-        for h in poignees:
-            kernel32.CloseHandle(h)
-    for _ in range(3):                                  # nos propres poignées peuvent gêner : sans elles
         veto, nom = dw.ejecter(id_ejectable)
         if veto in (0, 13):
             return {"ok": True, "etapes": etapes}

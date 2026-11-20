@@ -187,8 +187,10 @@ def test_assistant_refuse_les_demandes_douteuses():
 def test_assistant_arguments_stricts():
     from pipit import assistant
     assert assistant.executer([]) == 2
-    assert assistant.executer(["forcer", "USB\\VID_1&PID_2\\3", "\\\\.\\pipe\\autre", "00" * 32]) == 2
-    assert assistant.executer(["forcer", "USB\\VID_1&PID_2\\3", "\\\\.\\pipe\\pipit-" + "a" * 32, "zz"]) == 2
+    assert assistant.executer(["forcer", "USB\\VID_1&PID_2\\3", "\\\\.\\pipe\\autre", "00" * 32, "1"]) == 2
+    assert assistant.executer(["forcer", "USB\\VID_1&PID_2\\3", "\\\\.\\pipe\\pipit-" + "a" * 32, "zz", "1"]) == 2
+    assert assistant.executer(["forcer", "USB\\VID_1&PID_2\\3", "\\\\.\\pipe\\pipit-" + "a" * 32, "00" * 32,
+                               "pas_un_pid"]) == 2
 
 
 def test_remonter_seulement_un_peripherique_ejecte():

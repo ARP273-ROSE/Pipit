@@ -41,6 +41,7 @@ class _FiltreNatif(QtCore.QAbstractNativeEventFilter):
 
 class Zone(QtCore.QObject):
     liste_prete = QtCore.pyqtSignal(object, object)   # (périphériques, éjectés encore branchés)
+    ancienne_tache = QtCore.pyqtSignal(bool)
     fini = QtCore.pyqtSignal(object, object)          # (périphérique, Resultat)
     fini_admin = QtCore.pyqtSignal(str, object, object)   # (action, périphérique ou (id, nom), réponse)
 
@@ -50,7 +51,9 @@ class Zone(QtCore.QObject):
         self.reglages = reglages.charger()
         self.fenetre = None
         self.en_cours: set[str] = set()
+        self.pause_lecture: set[str] = set()       # éjections et forçages : Pipit ne touche pas aux volumes
         self._derniers: list[Peripherique] = []
+        self._tous: list[Peripherique] = []        # masqués compris (fenêtre des réglages)
         self._attente: list[tuple[str, str]] = []
         logo = RACINE / "logo_32.png"
         self.icone = QtGui.QIcon(str(logo)) if logo.exists() else app.style().standardIcon(
@@ -66,6 +69,7 @@ class Zone(QtCore.QObject):
         self.fini.connect(self._resultat)
         self.fini_admin.connect(self._resultat_admin)
         self.liste_prete.connect(self._liste_recue)
+        self.ancienne_tache.connect(self._proposer_retrait_tache)
         self._lecture = threading.Lock()              # une seule lecture des périphériques à la fois
         self._etat_icone = None
         self._relire = QtCore.QTimer(self)            # WM_DEVICECHANGE arrive en rafale : on regroupe
@@ -85,6 +89,7 @@ class Zone(QtCore.QObject):
         self._afficher_icone()
         self.tray.show()
         self.actualiser()
+        self._verifier_ancienne_tache()
 
     # ------------------------------------------------------------ apparence
     def appliquer_theme(self) -> None:
@@ -143,7 +148,7 @@ class Zone(QtCore.QObject):
     def actualiser(self, attendre: bool = False) -> None:
         """Relit les périphériques dans un fil : un disque qui ne répond plus ne fige jamais
         l'icône. Pas de lecture pendant une éjection (Pipit ouvrirait le volume qu'il retire)."""
-        if self.en_cours and not attendre:
+        if self.pause_lecture and not attendre:
             return
         pris = self._lecture.acquire(timeout=15) if attendre else self._lecture.acquire(blocking=False)
         if not pris:
@@ -151,13 +156,13 @@ class Zone(QtCore.QObject):
 
         def travail():
             try:
-                perifs = self.lister()
+                tous = self.lister(avec_masques=True)
                 attente = peripheriques.en_attente_de_retrait()
             except Exception:                            # noqa: BLE001
-                perifs, attente = [], []
+                tous, attente = [], []
             finally:
                 self._lecture.release()
-            self.liste_prete.emit(perifs, attente)
+            self.liste_prete.emit(tous, attente)
 
         fil = threading.Thread(target=travail, daemon=True, name="pipit-lecture")
         fil.start()
@@ -168,8 +173,11 @@ class Zone(QtCore.QObject):
     def demander_relecture(self) -> None:
         self._relire.start()
 
-    def _liste_recue(self, perifs, attente) -> None:
-        self._derniers, self._attente = perifs, attente
+    def _liste_recue(self, tous, attente) -> None:
+        masques = {m.upper() for m in self.reglages.masques}
+        self._tous = tous
+        self._derniers = [p for p in tous if p.materiel not in masques]
+        self._attente = attente
         self._afficher_icone()
         if self.fenetre is not None and self.fenetre.isVisible():
             self.fenetre.rafraichir_si_change()
@@ -298,6 +306,7 @@ class Zone(QtCore.QObject):
             if not self._confirmer_lecteur(p):
                 return
         self.en_cours.add(p.id)
+        self.pause_lecture.add(p.id)
 
         def travail():
             try:
@@ -336,6 +345,7 @@ class Zone(QtCore.QObject):
 
     def _resultat(self, p: Peripherique, r) -> None:
         self.en_cours.discard(p.id)
+        self.pause_lecture.discard(p.id)
         self.actualiser()
         if r.ok:
             if r.veto == peripheriques.VETO_DEJA_RETIRE:   # débranché pendant que le menu était ouvert
@@ -418,6 +428,8 @@ class Zone(QtCore.QObject):
     def _admin(self, action: str, cible, appel) -> None:
         cle = cible.id if isinstance(cible, Peripherique) else cible[0]
         self.en_cours.add(cle)
+        if action == "forcer":
+            self.pause_lecture.add(cle)
 
         def travail():
             try:
@@ -449,6 +461,7 @@ class Zone(QtCore.QObject):
     def _resultat_admin(self, action: str, cible, r: dict) -> None:
         cle = cible.id if isinstance(cible, Peripherique) else cible[0]
         self.en_cours.discard(cle)
+        self.pause_lecture.discard(cle)
         self.actualiser()
         if action == "forcer":
             if r.get("ok"):
@@ -502,6 +515,31 @@ class Zone(QtCore.QObject):
             self.ejecter(p, demander=False)
         elif partout_b is not None and boite.clickedButton() is partout_b:
             self.chercher_coupables(p, partout=True)
+
+    # ------------------------------------------------------------ tâche de la 0.2.0
+    def _verifier_ancienne_tache(self) -> None:
+        """La tâche « Pipit\\Assistant » de la 0.2.0 permettait d'obtenir les droits
+        d'administrateur sans UAC : on la cherche à chaque démarrage, en arrière-plan."""
+        def travail():
+            from . import assistant
+            self.ancienne_tache.emit(assistant.ancienne_tache_presente())
+        threading.Thread(target=travail, daemon=True, name="pipit-tache").start()
+
+    def _proposer_retrait_tache(self, presente: bool) -> None:
+        if not presente:
+            return
+        boite = QtWidgets.QMessageBox()
+        boite.setWindowTitle(systeme.NOM)
+        boite.setIcon(QtWidgets.QMessageBox.Icon.Warning)
+        boite.setText(tr("assistant.ancienne"))
+        oui = boite.addButton(tr("assistant.retirer_ancienne"), QtWidgets.QMessageBox.ButtonRole.AcceptRole)
+        boite.addButton(tr("dlg.plus_tard"), QtWidgets.QMessageBox.ButtonRole.RejectRole)
+        boite.exec()
+        if boite.clickedButton() is oui:
+            def travail():
+                from . import assistant
+                assistant.retirer_ancienne_tache()
+            threading.Thread(target=travail, daemon=True, name="pipit-tache").start()
 
     # ------------------------------------------------------------ fin de session
     def fin_de_session(self, gestionnaire) -> None:

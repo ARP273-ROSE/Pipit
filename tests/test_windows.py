@@ -157,8 +157,9 @@ def test_tiroir_sans_lecteur_ne_plante_pas():
     assert disques_windows.ouvrir_tiroir("Q") is False or True
 
 
-def test_canal_prive_aller_retour():
-    """Le côté élevé (sans UAC ici) répond par le canal authentifié ; une mauvaise clé est refusée."""
+def _canal_essai(pid_annonce):
+    import json
+    import os
     import secrets
     import threading
     from multiprocessing.connection import Listener
@@ -169,12 +170,29 @@ def test_canal_prive_aller_retour():
     with Listener(address=canal, family="AF_PIPE", authkey=cle) as ecoute:
         def accepter():
             with ecoute.accept() as conn:
-                recu.update(conn.recv())
+                recu["client"] = assistant._pid_du_bout(conn, "client")
+                if conn.poll(5):
+                    recu.update(json.loads(conn.recv_bytes().decode("utf-8")))
         fil = threading.Thread(target=accepter, daemon=True)
         fil.start()
-        code = assistant.executer(["coupables", "USB\\VID_FFFF&PID_FFFF\\INEXISTANT", canal, cle.hex()])
+        code = assistant.executer(["coupables", "USB\\VID_FFFF&PID_FFFF\\INEXISTANT", canal, cle.hex(),
+                                   str(pid_annonce if pid_annonce else os.getpid())])
         fil.join(10)
-    assert code == 1 and recu == {"ok": False, "detail": "peripherique"}
+    return code, recu
+
+
+def test_canal_prive_aller_retour():
+    """Le côté élevé (sans UAC ici) répond en JSON par le canal authentifié, au bon serveur."""
+    import os
+    code, recu = _canal_essai(None)
+    assert code == 1 and recu["ok"] is False and recu["detail"] == "peripherique"
+    assert recu["client"] == os.getpid()          # GetNamedPipeClientProcessId fonctionne
+
+
+def test_canal_refuse_un_serveur_imposteur():
+    """Si le canal n'appartient pas au Pipit annoncé, le côté élevé ne dit rien."""
+    code, recu = _canal_essai(4)                  # pid 4 = System : pas nous
+    assert code == 4 and "ok" not in recu
 
 
 def test_disque_interne_jamais_force():

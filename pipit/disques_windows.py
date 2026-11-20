@@ -265,7 +265,7 @@ def _disques_physiques(guid=GUID_DEVINTERFACE_DISK):
 def _lettres_par_disque() -> dict[tuple[int, int], list[tuple[str, str]]]:
     """{(type, numéro de disque): [(lettre, nom du volume)]} ; type 7 = disque, 2 = CD/DVD."""
     ancien = wintypes.DWORD(0)
-    kernel32.SetThreadErrorMode(0x1 | 0x10, ctypes.byref(ancien))   # pas de boîte « insérez un disque » (ce fil seul)
+    kernel32.SetThreadErrorMode(0x1 | 0x8000, ctypes.byref(ancien))   # pas de boîte « insérez un disque » (ce fil seul)
     resultat: dict[int, list[tuple[str, str]]] = {}
     try:
         masque = kernel32.GetLogicalDrives()
