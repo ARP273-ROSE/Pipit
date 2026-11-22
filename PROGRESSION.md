@@ -1,5 +1,24 @@
 # Pipit — progression
 
+## 📌 Note de reprise (22/11/2026)
+
+- **En production** : 0.4.1 (Release v0.4.1, seule Release du dépôt depuis le 20/11 : `release_unique`
+  activé, étape ajoutée à `release-windows.yml`). Branche `main`, à jour avec GitHub.
+- **Historique réécrit le 20/11** (git filter-repo, nom de machine retiré d'un commit) puis poussé en force :
+  toute copie locale antérieure → `git fetch && git reset --hard origin/main`, jamais `git pull`.
+- **Vérifié sur un vrai poste** : détection, éjection, vitesse USB (USB 3 — 5 Gbit/s derrière 2 hubs),
+  **remontage d'une carte éjectée sans la débrancher** (20/11, méthode gagnante non relevée).
+  L'utilitaire payant a été désinstallé : Pipit est désormais l'outil en service.
+- **PAS vérifié en vrai** : lettre fixe, coupure du courant après éjection, tiroir CD/DVD, Win+Alt à la
+  frappe, raccourci par appareil, programme au branchement, refus réel avec programme fautif nommé.
+- **Prochaines étapes** (attendre les retours d'usage) :
+  1. Essayer une lettre fixe sur un disque USB (bouton « Réglages… » de la ligne).
+  2. Tiroir CD/DVD, Win+Alt, coupure du courant.
+  3. Relever quelle méthode de `admin_windows.remonter` a réussi (journal de l'appli) et la noter ici.
+- **Pièges** : boîtes Qt modales et bulles de secours offscreen plantent/figent la CI Windows → toujours
+  neutraliser `QMessageBox.warning` et `tray.showMessage` dans les tests ; aucun nom de machine dans ce
+  fichier (test_confidentialite).
+
 Remplaçant libre d'un utilitaire payant d'éjection USB : icône près de l'horloge,
 éjection par CM_Request_Device_EjectW, programme fautif lu dans le journal
 Kernel-PnP (événement 225), raccourcis globaux RegisterHotKey.
