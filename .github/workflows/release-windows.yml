@@ -76,6 +76,7 @@ jobs:
         id: kit
         shell: bash
         run: |
+          "$(command -v python3 || command -v python)" -c "import json;print('python=' + str(json.load(open('kit.json')).get('python') or '3.14'))" >> "$GITHUB_OUTPUT"
           python - <<'PY' >> "$GITHUB_OUTPUT"
           import json, pathlib
           k = json.loads(pathlib.Path('kit.json').read_text(encoding='utf-8'))
@@ -127,7 +128,7 @@ jobs:
       - name: Installer Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
+          python-version: ${{ steps.kit.outputs.python || '3.14' }}
 
       # Controles statiques, quand le depot les embarque. Ils sont facultatifs
       # par construction : un projet qui ne les a pas passe outre sans echouer.
